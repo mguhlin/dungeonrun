@@ -16,9 +16,17 @@ function button(scene:Phaser.Scene,x:number,y:number,w:number,h:number,label:str
 
 class BootScene extends Phaser.Scene {
   constructor(){super('boot')}
-  preload(){ this.load.image('keyart','assets/keyart.png'); }
+  preload(){
+    this.load.image('keyart','assets/keyart.png');
+    this.load.image('portrait-bud','assets/portrait-bud.png');
+    this.load.image('portrait-erin','assets/portrait-erin.png');
+    this.load.image('portrait-gin','assets/portrait-gin.png');
+    this.load.image('enemy','assets/enemy-icon.png');
+    this.load.image('boss','assets/boss-icon.png');
+    this.load.image('moxie','assets/moxie-icon.png');
+  }
   create(){
-    const make=(key:string,color:number,shape:'circle'|'rect'='circle')=>{const g=this.make.graphics({x:0,y:0});g.fillStyle(color);shape==='circle'?g.fillCircle(24,24,20):g.fillRoundedRect(4,4,40,40,7);g.lineStyle(3,0xefe6ce,.75);shape==='circle'?g.strokeCircle(24,24,20):g.strokeRoundedRect(4,4,40,40,7);g.generateTexture(key,48,48);g.destroy();};
+    const make=(key:string,color:number,shape:'circle'|'rect'='circle')=>{if(this.textures.exists(key))return;const g=this.make.graphics({x:0,y:0});g.fillStyle(color);shape==='circle'?g.fillCircle(24,24,20):g.fillRoundedRect(4,4,40,40,7);g.lineStyle(3,0xefe6ce,.75);shape==='circle'?g.strokeCircle(24,24,20):g.strokeRoundedRect(4,4,40,40,7);g.generateTexture(key,48,48);g.destroy();};
     make('bud',0xd47735); make('erin',0x4fa8a0); make('gin',0xb585c6); make('moxie',0xe8e4d9,'rect'); make('enemy',0xa8493f); make('boss',0xdebd59,'rect'); make('shot',0xf3d477); make('loot',0x68d6a1,'rect');
     this.scene.start('title');
   }
@@ -34,9 +42,10 @@ class TitleScene extends Phaser.Scene {
     this.add.text(73,132,'THE UNDERWORKS HAS AN OPEN POSITION.',{fontFamily:'monospace',fontSize:'18px',color:C.amber,letterSpacing:2});
     this.add.text(72,188,'The town is gone. The sky is gone.\nYour dog is still here. That will have to be enough.',{fontFamily:'Georgia,serif',fontSize:'27px',color:'#f2ead8',lineSpacing:10});
     const saves=[1,2,3].map(loadSave).filter(Boolean) as SaveGame[];
-    button(this,185,555,230,56,'NEW RUN',()=>this.scene.start('select'));
-    button(this,445,555,230,56,saves.length?'CONTINUE':'NO SAVES YET',()=>{if(saves[0])this.scene.start('game',{save:saves.sort((a,b)=>Date.parse(b.savedAt)-Date.parse(a.savedAt))[0]});},saves.length?0x67b4ad:0x576365);
-    button(this,705,555,230,56,'HOW TO PLAY',()=>this.showHelp());
+    button(this,160,555,210,56,'NEW RUN',()=>this.scene.start('select'));
+    button(this,395,555,210,56,saves.length?'CONTINUE':'NO SAVES YET',()=>{if(saves[0])this.scene.start('game',{save:saves.sort((a,b)=>Date.parse(b.savedAt)-Date.parse(a.savedAt))[0]});},saves.length?0x67b4ad:0x576365);
+    button(this,630,555,210,56,'FIELD GUIDE',()=>this.scene.start('guide'));
+    button(this,865,555,210,56,'HOW TO PLAY',()=>this.showHelp());
     this.add.text(72,674,'Original story and game • Desktop + mobile landscape',{fontSize:'15px',color:'#b8c4bd'});
   }
   showHelp(){
@@ -45,6 +54,34 @@ class TitleScene extends Phaser.Scene {
     const copy=this.add.text(W/2-330,145,'HOW TO SURVIVE',{fontSize:'32px',fontStyle:'bold',color:C.amber}).setDepth(22);
     const body=this.add.text(W/2-330,205,'MOVE     WASD / arrow keys / left touch pad\nAIM      Pointer or automatic mobile targeting\nATTACK   Click, Space, or ATTACK button\nDODGE    Shift or DODGE button\nSKILL    E or SKILL button\nMOXIE    Q or DOG button\n\nClear each sector, defeat its boss, collect supplies,\nand reach the lift. Green rest terminals save progress.\nMoxie can fight, scout, and revive you once per sector.',{fontFamily:'monospace',fontSize:'20px',color:C.paper,lineSpacing:12}).setDepth(22);
     const close=button(this,W/2,575,220,50,'GOT IT',()=>[shade,panel,copy,body,close].forEach(o=>o.destroy()));close.setDepth(22);
+  }
+}
+
+class GuideScene extends Phaser.Scene {
+  page=0; rows:Phaser.GameObjects.GameObject[]=[];
+  constructor(){super('guide')}
+  create(){
+    this.add.rectangle(W/2,H/2,W,H,0x091416);
+    this.add.text(55,32,'THE LEDGER’S COMPLETELY REASSURING FIELD GUIDE',{fontSize:'30px',fontStyle:'bold',color:C.paper});
+    this.add.text(56,72,'All twenty sectors, disclosed in advance because surprise is an administrative expense.',{fontFamily:'monospace',fontSize:'15px',color:C.amber});
+    button(this,110,675,150,42,'← BACK',()=>this.scene.start('title'));
+    button(this,980,675,130,42,'PREVIOUS',()=>{this.page=Math.max(0,this.page-1);this.renderPage();});
+    button(this,1140,675,130,42,'NEXT',()=>{this.page=Math.min(3,this.page+1);this.renderPage();});
+    this.renderPage();
+  }
+  renderPage(){
+    this.rows.forEach(o=>o.destroy());this.rows=[];
+    const slice=LEVELS.slice(this.page*5,this.page*5+5);
+    slice.forEach((level,i)=>{
+      const y=126+i*103;
+      const panel=this.add.rectangle(W/2,y+40,1170,92,0x132124,.95).setStrokeStyle(1,level.bossColor,.8);
+      const number=this.add.text(75,y,`${level.id.toString().padStart(2,'0')}`,{fontSize:'31px',fontStyle:'bold',color:C.amber});
+      const title=this.add.text(135,y,`${level.title}  •  ${level.environment}`,{fontSize:'20px',fontStyle:'bold',color:C.paper});
+      const detail=this.add.text(135,y+31,`CREATURES: ${level.enemyNames.join(' and ')}   |   BOSS: ${level.boss}\nPRESSURE: ${level.mechanic}   |   OBJECTIVE: ${level.objective}`,{fontFamily:'monospace',fontSize:'13px',color:'#bfcfca',lineSpacing:6,wordWrap:{width:1030}});
+      this.rows.push(panel,number,title,detail);
+    });
+    const pageText=this.add.text(W/2,638,`SECTORS ${this.page*5+1}–${this.page*5+5} OF 20`,{fontFamily:'monospace',fontSize:'15px',color:C.amber}).setOrigin(.5);
+    this.rows.push(pageText);
   }
 }
 
@@ -59,7 +96,11 @@ class SelectScene extends Phaser.Scene {
   }
   card(hero:HeroDefinition,x:number,y:number){
     const panel=this.add.rectangle(x,y,360,410,0x142124).setStrokeStyle(3,hero.color).setInteractive({useHandCursor:true});
-    this.add.image(x,y-132,hero.id).setScale(2.1);
+    this.add.circle(x,y-132,80,hero.color,.92).setStrokeStyle(4,0xefe6ce,.85);
+    const portrait=this.add.image(x,y-132,`portrait-${hero.id}`).setDisplaySize(146,146);
+    const maskShape=this.make.graphics({x:0,y:0});
+    maskShape.fillStyle(0xffffff).fillCircle(x,y-132,72);
+    portrait.setMask(maskShape.createGeometryMask());
     this.add.text(x,y-62,hero.name.toUpperCase(),{fontSize:'34px',fontStyle:'bold',color:C.paper}).setOrigin(.5);
     this.add.text(x,y-20,hero.title,{fontSize:'20px',color:'#e6ad52'}).setOrigin(.5);
     this.add.text(x-148,y+20,`MIGHT ${hero.stats.might}   GRIT ${hero.stats.grit}\nAGILITY ${hero.stats.agility}  AWARENESS ${hero.stats.awareness}\nINGENUITY ${hero.stats.ingenuity}  RESOLVE ${hero.stats.resolve}\n\n${hero.skill}\n${hero.skillDescription}`,{fontSize:'16px',color:'#cad4ce',wordWrap:{width:296},lineSpacing:8});
@@ -95,6 +136,18 @@ class GameScene extends Phaser.Scene {
   enemies!:Phaser.Physics.Arcade.Group; shots!:Phaser.Physics.Arcade.Group; loot!:Phaser.Physics.Arcade.Group; walls!:Phaser.Physics.Arcade.StaticGroup;
   cursors!:Phaser.Types.Input.Keyboard.CursorKeys; keys!:Record<string,Phaser.Input.Keyboard.Key>; hp=100; maxHp=100; stamina=100; moxieHp=60; kills=0; required=0; bossSpawned=false; completed=false; lastAttack=0; lastSkill=0; nextMoxieAttack=0; revived=false;
   hpBar!:Phaser.GameObjects.Graphics; mini!:Phaser.GameObjects.Graphics; status!:Phaser.GameObjects.Text; objective!:Phaser.GameObjects.Text; touchMove={x:0,y:0}; touchAttack=false;
+  wallRects:Array<{x:number;y:number;w:number;h:number}>=[];
+  ledgerBox!:Phaser.GameObjects.Rectangle; ledgerText!:Phaser.GameObjects.Text; lowHealthCommented=false;
+  ledgerLines=[
+    'THE LEDGER: Running is encouraged. It improves the flavor of the panic.',
+    'THE LEDGER: Your survival remains statistically inconvenient.',
+    'THE LEDGER: Reminder: screaming is not an approved navigation tool.',
+    'THE LEDGER: Moxie marked your position “obvious.”',
+    'THE LEDGER: Those walls are structural. Your confidence is not.',
+    'THE LEDGER: Excellent form. Terrible odds. Please continue.',
+    'THE LEDGER: Breaks are unpaid. Existential crises count as breaks.',
+    'THE LEDGER: Management noticed you are still alive. Policy review pending.'
+  ];
   constructor(){super('game')}
   init(data:{save:SaveGame}){this.save=data.save;this.hero=HEROES.find(h=>h.id===this.save.heroId)!;this.level=LEVELS[this.save.level-1]??LEVELS[0];}
   create(){
@@ -114,19 +167,41 @@ class GameScene extends Phaser.Scene {
     this.cursors=this.input.keyboard!.createCursorKeys();this.keys=this.input.keyboard!.addKeys('W,A,S,D,E,Q,SPACE,SHIFT') as Record<string,Phaser.Input.Keyboard.Key>;
     this.createHud(); this.createTouchControls(); this.showLevelCard();
     this.input.on('pointerdown',(p:Phaser.Input.Pointer)=>{if(p.x>W*.42&&p.y<H*.82)this.attack(p.worldX,p.worldY)});
+    this.time.addEvent({delay:14000,loop:true,callback:()=>this.ledgerSay(Phaser.Utils.Array.GetRandom(this.ledgerLines))});
   }
   buildDungeon(){
     this.add.rectangle(900,550,1800,1100,this.level.floorColor);
     const grid=this.add.grid(900,550,1800,1100,64,64,0x000000,0,0xffffff,.035);grid.setDepth(0);
-    this.walls=this.physics.add.staticGroup();
-    const add=(x:number,y:number,w:number,h:number)=>{const r=this.add.rectangle(x,y,w,h,this.level.wallColor).setStrokeStyle(3,0x0a1112,.65);this.physics.add.existing(r,true);this.walls.add(r);};
+    this.walls=this.physics.add.staticGroup();this.wallRects=[];
+    const add=(x:number,y:number,w:number,h:number)=>{this.wallRects.push({x,y,w,h});const r=this.add.rectangle(x,y,w,h,this.level.wallColor).setStrokeStyle(3,0x0a1112,.65);this.physics.add.existing(r,true);this.walls.add(r);};
     add(900,18,1800,36);add(900,1082,1800,36);add(18,550,36,1100);add(1782,550,36,1100);
-    const seed=this.level.id*7919;for(let i=0;i<16;i++){const x=280+((seed+i*263)%1250),y=120+((seed+i*397)%830),horizontal=i%2===0;add(x,y,horizontal?170:38,horizontal?38:150);}
+    // A connected room-and-corridor plan. Each divider has staggered doorways,
+    // producing recognizable chambers without sealing off the route to the boss.
+    [450,900,1350].forEach((x,column)=>{
+      const gaps=column%2===0?[[285,405],[690,815]]:[[185,305],[585,710],[900,1015]];
+      let from=36;
+      for(const [a,b] of gaps){if(a>from)add(x,(from+a)/2,34,a-from);from=b;}
+      if(from<1064)add(x,(from+1064)/2,34,1064-from);
+    });
+    [340,720].forEach((y,row)=>{
+      const gaps=row===0?[[190,320],[690,835],[1160,1300],[1580,1710]]:[[90,220],[520,670],[1030,1180],[1460,1610]];
+      let from=36;
+      for(const [a,b] of gaps){if(a>from)add((from+a)/2,y,a-from,34);from=b;}
+      if(from<1764)add((from+1764)/2,y,1764-from,34);
+    });
+    const seed=this.level.id*7919;
+    // Short cover walls make combat spaces tactical while preserving wide lanes.
+    for(let i=0;i<18;i++){const x=210+((seed+i*263)%1370),y=115+((seed+i*397)%850),horizontal=i%3!==0;add(x,y,horizontal?105:28,horizontal?28:92);}
     for(let i=0;i<10;i++){const x=150+((seed+i*181)%1450),y=100+((seed+i*317)%850);this.add.circle(x,y,3,0xe6ad52,.35);}
+    ['RESTROOM','KEEP OUT','LIFT →','BREAK ROOM'].forEach((label,i)=>this.add.text(245+i*405,310+(i%2)*410,label,{fontFamily:'monospace',fontSize:'13px',color:'#17130b',backgroundColor:'#d7b25c',padding:{x:8,y:4}}).setRotation(i%2?.02:-.025));
     this.add.text(70,80,`SECTOR ${this.level.id.toString().padStart(2,'0')} • ${this.level.environment.toUpperCase()}`,{fontFamily:'monospace',fontSize:'17px',color:'#e7c77e',backgroundColor:'#172224aa',padding:{x:10,y:6}});
   }
-  randomOpen(){return {x:360+Math.random()*1250,y:110+Math.random()*850}}
-  spawnEnemy(boss:boolean){const p=this.randomOpen();const e=this.enemies.create(p.x,p.y,boss?'boss':'enemy') as Enemy;e.setDepth(4).setCircle(19,5,5);e.boss=boss;e.maxHp=boss?160+this.level.id*38:24+this.level.id*5;e.hp=e.maxHp;e.speed=boss?55+this.level.id:62+this.level.id*2;if(boss)e.setScale(1.8).setTint(this.level.bossColor);else e.setTint(Phaser.Display.Color.IntegerToColor(this.level.bossColor).darken(28).color);}
+  randomOpen(){
+    // Spawn near the center of one of the twelve chambers, away from dividers.
+    const cols=[225,675,1125,1575],rows=[170,530,900];
+    return {x:cols[Math.floor(Math.random()*cols.length)]+Phaser.Math.Between(-105,105),y:rows[Math.floor(Math.random()*rows.length)]+Phaser.Math.Between(-85,85)};
+  }
+  spawnEnemy(boss:boolean){const p=this.randomOpen();const e=this.enemies.create(p.x,p.y,boss?'boss':'enemy') as Enemy;e.setDepth(4).setCircle(19,5,5);e.boss=boss;e.maxHp=boss?160+this.level.id*38:24+this.level.id*5;e.hp=e.maxHp;e.speed=boss?55+this.level.id:62+this.level.id*2;e.setScale(boss?1.55:.88);}
   createHud(){
     this.add.rectangle(0,0,W,82,0x071112,.88).setOrigin(0).setScrollFactor(0).setDepth(20);
     this.add.text(24,14,`${this.hero.name.toUpperCase()}  •  RANK ${this.save.rank}`,{fontSize:'18px',fontStyle:'bold',color:C.paper}).setScrollFactor(0).setDepth(22);
@@ -135,6 +210,8 @@ class GameScene extends Phaser.Scene {
     this.objective=this.add.text(440,15,`LEVEL ${this.level.id}: ${this.level.title}\n${this.level.objective}`,{fontSize:'16px',color:'#d5ded9',align:'center'}).setOrigin(.5,0).setScrollFactor(0).setDepth(22);
     this.status=this.add.text(790,16,'',{fontFamily:'monospace',fontSize:'14px',color:'#d5ded9'}).setScrollFactor(0).setDepth(22);
     this.mini=this.add.graphics().setScrollFactor(0).setDepth(22);
+    this.ledgerBox=this.add.rectangle(W/2,H-34,720,42,0x071112,.9).setStrokeStyle(1,0xe6ad52,.7).setScrollFactor(0).setDepth(24).setAlpha(0);
+    this.ledgerText=this.add.text(W/2,H-34,'',{fontFamily:'monospace',fontSize:'14px',color:'#efd184',align:'center'}).setOrigin(.5).setScrollFactor(0).setDepth(25).setAlpha(0);
   }
   createTouchControls(){
     if(!this.sys.game.device.input.touch)return;
@@ -165,6 +242,7 @@ class GameScene extends Phaser.Scene {
       [shade,t,s,m,goBg,goText].forEach(o=>o.destroy());
       this.physics.resume();
       this.player.setVelocity(0);
+      this.ledgerSay(`THE LEDGER: Welcome to Level ${this.level.id}. Your safety orientation has been waived.`);
     };
     goBg.on('pointerover',()=>goBg.setFillStyle(0x294044))
       .on('pointerout',()=>goBg.setFillStyle(0x172325))
@@ -182,15 +260,15 @@ class GameScene extends Phaser.Scene {
   attack(x:number,y:number){if(this.time.now<this.lastAttack+320)return;this.lastAttack=this.time.now;const a=Phaser.Math.Angle.Between(this.player.x,this.player.y,x,y);const s=this.shots.create(this.player.x,this.player.y,'shot') as Phaser.Physics.Arcade.Sprite;s.setScale(.35).setTint(this.hero.color).setDepth(6);this.physics.velocityFromRotation(a,430,s.body!.velocity);this.time.delayedCall(850,()=>s.destroy());}
   mobileAttack(){let target:Enemy|null=null,dist=9999;this.enemies.children.each(o=>{const e=o as Enemy;const d=Phaser.Math.Distance.Between(this.player.x,this.player.y,e.x,e.y);if(d<dist){dist=d;target=e}return true;});if(target)this.attack((target as Enemy).x,(target as Enemy).y);}
   hitEnemy(s:Phaser.Physics.Arcade.Sprite,e:Enemy){s.destroy();e.hp-=10+this.save.stats.might*.8;this.floatText(e.x,e.y-28,`-${Math.round(10+this.save.stats.might*.8)}`,'#f6d17c');e.setTintFill(0xffffff);this.time.delayedCall(70,()=>e.active&&e.clearTint());if(e.hp<=0)this.killEnemy(e);}
-  killEnemy(e:Enemy){const boss=!!e.boss;const p={x:e.x,y:e.y};e.destroy();this.kills++;this.save.xp+=boss?150:12+this.level.id;if(Math.random()<.36||boss)this.loot.create(p.x,p.y,'loot').setScale(boss?1:.65);if(!this.bossSpawned&&this.kills>=this.required){this.bossSpawned=true;this.spawnEnemy(true);this.announce(`BOSS INBOUND: ${this.level.boss.toUpperCase()}`);}if(boss)this.finishLevel();this.rankUp();}
+  killEnemy(e:Enemy){const boss=!!e.boss;const p={x:e.x,y:e.y};e.destroy();this.kills++;this.save.xp+=boss?150:12+this.level.id;if(Math.random()<.36||boss)this.loot.create(p.x,p.y,'loot').setScale(boss?1:.65);if(this.kills%4===0&&!boss)this.ledgerSay('THE LEDGER: Four hostiles removed. Custodial deducted cleanup from your pay.');if(!this.bossSpawned&&this.kills>=this.required){this.bossSpawned=true;this.spawnEnemy(true);this.announce(`BOSS INBOUND: ${this.level.boss.toUpperCase()}`);this.ledgerSay(`THE LEDGER: ${this.level.boss} would like a brief word about your performance.`);}if(boss)this.finishLevel();this.rankUp();}
   rankUp(){const needed=this.save.rank*100;if(this.save.xp>=needed){this.save.xp-=needed;this.save.rank++;this.save.statPoints++;this.maxHp+=6;this.hp=this.maxHp;this.announce(`RANK ${this.save.rank}! ATTRIBUTE POINT BANKED.`);}}
   contact(e:Enemy){if(!e.active||this.player.getData('hurt'))return;this.player.setData('hurt',true);this.damage((e.boss?18:7)+this.level.id*.8);const a=Phaser.Math.Angle.Between(e.x,e.y,this.player.x,this.player.y);this.player.setVelocity(Math.cos(a)*320,Math.sin(a)*320);this.time.delayedCall(650,()=>this.player.setData('hurt',false));}
   moxieContact(e:Enemy){if(!e.active||this.moxie.getData('hurt')||this.moxieHp<=0)return;this.moxie.setData('hurt',true);this.moxieHp-=e.boss?15:5;this.time.delayedCall(700,()=>this.moxie.setData('hurt',false));}
-  damage(n:number){this.hp-=n;this.cameras.main.shake(100,.006);if(this.hp<=0){if(!this.revived&&this.moxieHp>0){this.revived=true;this.hp=this.maxHp*.35;this.moxieHp=Math.max(1,this.moxieHp-20);this.announce('MOXIE REVIVED YOU. GOOD DOG. QUESTIONABLE BENEFITS PACKAGE.');}else this.gameOver();}}
-  dodge(){if(this.stamina<25)return;this.stamina-=25;const b=this.player.body!.velocity.clone();if(b.length()<10)b.set(1,0);b.normalize().scale(440);this.player.setVelocity(b.x,b.y);this.player.setData('hurt',true);this.time.delayedCall(280,()=>this.player.setData('hurt',false));}
+  damage(n:number){this.hp-=n;this.cameras.main.shake(100,.006);if(this.hp/this.maxHp<.28&&!this.lowHealthCommented){this.lowHealthCommented=true;this.ledgerSay('THE LEDGER: Health critical. Have you considered simply being harder to kill?');}if(this.hp<=0){if(!this.revived&&this.moxieHp>0){this.revived=true;this.hp=this.maxHp*.35;this.moxieHp=Math.max(1,this.moxieHp-20);this.announce('MOXIE REVIVED YOU. GOOD DOG. QUESTIONABLE BENEFITS PACKAGE.');this.ledgerSay('THE LEDGER: Your dog filed a complaint regarding team competency.');}else this.gameOver();}}
+  dodge(){if(this.stamina<25)return;this.stamina-=25;const b=this.player.body!.velocity.clone();if(b.length()<10)b.set(1,0);b.normalize().scale(440);this.player.setVelocity(b.x,b.y);this.player.setData('hurt',true);if(Math.random()<.14)this.ledgerSay('THE LEDGER: A graceful dodge. Your paperwork remains stationary.');this.time.delayedCall(280,()=>this.player.setData('hurt',false));}
   skill(){if(this.time.now<this.lastSkill+5000)return;this.lastSkill=this.time.now;if(this.hero.id==='bud'){this.enemies.children.each(o=>{const e=o as Enemy;if(Phaser.Math.Distance.Between(this.player.x,this.player.y,e.x,e.y)<150){e.hp-=35;e.setVelocity((e.x-this.player.x)*4,(e.y-this.player.y)*4);if(e.hp<=0)this.killEnemy(e);}return true;});this.cameras.main.shake(180,.01);}else if(this.hero.id==='erin'){const p=this.input.activePointer;const a=Phaser.Math.Angle.Between(this.player.x,this.player.y,p.worldX,p.worldY);this.player.setPosition(this.player.x+Math.cos(a)*180,this.player.y+Math.sin(a)*180);this.enemies.children.each(o=>{(o as Enemy).setTint(0x7be0d4);return true;});this.time.delayedCall(1800,()=>this.enemies.children.each(o=>{(o as Enemy).clearTint();return true;}));}else{const x=this.player.x,y=this.player.y;const marker=this.add.circle(x,y,20,0xc58ed6,.6);this.tweens.add({targets:marker,scale:3,alpha:0,duration:1100,onComplete:()=>{this.enemies.children.each(o=>{const e=o as Enemy;if(Phaser.Math.Distance.Between(x,y,e.x,e.y)<150){e.hp-=42;if(e.hp<=0)this.killEnemy(e);}return true;});marker.destroy();this.cameras.main.shake(220,.012);}});}}
-  commandMoxie(){this.save.moxieBond=Math.min(10,this.save.moxieBond+.02);this.mobileAttack();this.announce('MOXIE: TARGET MARKED. TAIL STATUS: OPERATIONAL.');}
-  collect(l:Phaser.Physics.Arcade.Sprite){l.destroy();this.hp=Math.min(this.maxHp,this.hp+18);this.stamina=100;this.floatText(this.player.x,this.player.y-40,'SUPPLIES + HEALTH','#69d4a0');}
+  commandMoxie(){this.save.moxieBond=Math.min(10,this.save.moxieBond+.02);this.mobileAttack();this.announce('MOXIE: TARGET MARKED. TAIL STATUS: OPERATIONAL.');if(Math.random()<.3)this.ledgerSay('THE LEDGER: Moxie understood the assignment before you finished saying it.');}
+  collect(l:Phaser.Physics.Arcade.Sprite){l.destroy();this.hp=Math.min(this.maxHp,this.hp+18);this.stamina=100;this.floatText(this.player.x,this.player.y-40,'SUPPLIES + HEALTH','#69d4a0');if(Math.random()<.35)this.ledgerSay('THE LEDGER: Loot acquired. Side effects include optimism and inventory management.');}
   finishLevel(){this.completed=true;this.player.setVelocity(0);this.save.achievements.push(`Cleared ${this.level.title}`);this.save.moxieBond=Math.min(10,this.save.moxieBond+.5);writeSave(this.save);this.time.delayedCall(600,()=>this.showRest());}
   showRest(){
     const shade=this.add.rectangle(W/2,H/2,W,H,0x061011,.94).setScrollFactor(0).setDepth(70);const title=this.add.text(W/2,80,'REST AREA • CHECKPOINT SAVED',{fontSize:'34px',fontStyle:'bold',color:C.amber}).setOrigin(.5).setScrollFactor(0).setDepth(71);
@@ -203,8 +281,9 @@ class GameScene extends Phaser.Scene {
   ending(choice:string){this.children.removeAll();this.add.rectangle(W/2,H/2,W,H,0x071112);this.add.text(W/2,170,choice,{fontSize:'72px',fontStyle:'bold',color:C.amber}).setOrigin(.5);this.add.text(W/2,285,choice==='ESCAPE'?'Morning returns to Split Pine. Moxie finds the first patch of sunlight.':choice==='CONTROL'?'The Ledger stutters as a new foreman signs in. The first new rule: dogs outrank machines.':'The dungeon opens like a clenched fist. Millions of stolen stories rush toward the sky.',{fontFamily:'Georgia,serif',fontSize:'28px',color:C.paper,align:'center',wordWrap:{width:780}}).setOrigin(.5);button(this,W/2,560,300,55,'RETURN TO TITLE',()=>this.scene.start('title'));}
   gameOver(){this.completed=true;this.physics.pause();const shade=this.add.rectangle(W/2,H/2,W,H,0x120708,.9).setScrollFactor(0).setDepth(90);const t=this.add.text(W/2,210,'PERFORMANCE REVIEW: INCONCLUSIVE',{fontSize:'34px',fontStyle:'bold',color:'#ef826d'}).setOrigin(.5).setScrollFactor(0).setDepth(91);const b=button(this,W/2,355,300,58,'RETRY CHECKPOINT',()=>this.scene.restart({save:this.save}));b.setScrollFactor(0).setDepth(92);const q=button(this,W/2,440,300,50,'SAVE AND QUIT',()=>this.scene.start('title'));q.setScrollFactor(0).setDepth(92);}
   announce(msg:string){this.status.setText(msg);this.time.delayedCall(2600,()=>this.status.setText(''));}
+  ledgerSay(msg:string){if(!this.ledgerText?.active)return;this.tweens.killTweensOf([this.ledgerBox,this.ledgerText]);this.ledgerText.setText(msg).setAlpha(1);this.ledgerBox.setAlpha(1);this.time.delayedCall(4300,()=>{if(!this.ledgerText?.active)return;this.tweens.add({targets:[this.ledgerBox,this.ledgerText],alpha:0,duration:500});});}
   floatText(x:number,y:number,msg:string,color:string){const t=this.add.text(x,y,msg,{fontSize:'14px',fontStyle:'bold',color}).setOrigin(.5).setDepth(10);this.tweens.add({targets:t,y:y-35,alpha:0,duration:700,onComplete:()=>t.destroy()});}
-  drawHud(){this.stamina=Math.min(100,this.stamina+.12);this.hpBar.clear();this.hpBar.fillStyle(0x263334).fillRect(180,17,210,14);this.hpBar.fillStyle(0xc85249).fillRect(180,17,210*Math.max(0,this.hp/this.maxHp),14);this.hpBar.fillStyle(0x3e7973).fillRect(180,41,210*this.stamina/100,8);this.hpBar.fillStyle(0xe8e4d9).fillRect(180,57,210*Math.max(0,this.moxieHp/(60+this.save.moxieBond*8)),7);this.status.setText(this.status.text||`HOSTILES ${Math.max(0,this.required-this.kills)} • ${this.bossSpawned?'BOSS ACTIVE':'BOSS LOCKED'}`);this.mini.clear();this.mini.fillStyle(0x071112,.8).fillRect(W-172,8,160,66);this.mini.lineStyle(1,0x8da09a).strokeRect(W-172,8,160,66);this.mini.fillStyle(0x67b4ad).fillCircle(W-172+this.player.x/1800*160,8+this.player.y/1100*66,3);this.mini.fillStyle(0xe8e4d9).fillCircle(W-172+this.moxie.x/1800*160,8+this.moxie.y/1100*66,2);this.mini.fillStyle(0xd15c4f);this.enemies.children.each(o=>{const e=o as Enemy;this.mini.fillCircle(W-172+e.x/1800*160,8+e.y/1100*66,e.boss?3:1);return true;});}
+  drawHud(){this.stamina=Math.min(100,this.stamina+.12);this.hpBar.clear();this.hpBar.fillStyle(0x263334).fillRect(180,17,210,14);this.hpBar.fillStyle(0xc85249).fillRect(180,17,210*Math.max(0,this.hp/this.maxHp),14);this.hpBar.fillStyle(0x3e7973).fillRect(180,41,210*this.stamina/100,8);this.hpBar.fillStyle(0xe8e4d9).fillRect(180,57,210*Math.max(0,this.moxieHp/(60+this.save.moxieBond*8)),7);this.status.setText(this.status.text||`HOSTILES ${Math.max(0,this.required-this.kills)} • ${this.bossSpawned?'BOSS ACTIVE':'BOSS LOCKED'}`);this.mini.clear();this.mini.fillStyle(0x071112,.8).fillRect(W-172,8,160,66);this.mini.lineStyle(1,0x8da09a).strokeRect(W-172,8,160,66);this.mini.fillStyle(0x64716e,.72);this.wallRects.forEach(r=>this.mini.fillRect(W-172+(r.x-r.w/2)/1800*160,8+(r.y-r.h/2)/1100*66,Math.max(1,r.w/1800*160),Math.max(1,r.h/1100*66)));this.mini.fillStyle(0x67b4ad).fillCircle(W-172+this.player.x/1800*160,8+this.player.y/1100*66,3);this.mini.fillStyle(0xe8e4d9).fillCircle(W-172+this.moxie.x/1800*160,8+this.moxie.y/1100*66,2);this.mini.fillStyle(0xd15c4f);this.enemies.children.each(o=>{const e=o as Enemy;this.mini.fillCircle(W-172+e.x/1800*160,8+e.y/1100*66,e.boss?3:1);return true;});}
 }
 
-new Phaser.Game({type:Phaser.AUTO,parent:'game',width:W,height:H,backgroundColor:'#081011',pixelArt:false,physics:{default:'arcade',arcade:{debug:false}},scale:{mode:Phaser.Scale.FIT,autoCenter:Phaser.Scale.CENTER_BOTH},scene:[BootScene,TitleScene,SelectScene,StoryScene,GameScene]});
+new Phaser.Game({type:Phaser.AUTO,parent:'game',width:W,height:H,backgroundColor:'#081011',pixelArt:false,physics:{default:'arcade',arcade:{debug:false}},scale:{mode:Phaser.Scale.FIT,autoCenter:Phaser.Scale.CENTER_BOTH},scene:[BootScene,TitleScene,GuideScene,SelectScene,StoryScene,GameScene]});
