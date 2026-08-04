@@ -153,8 +153,10 @@ class GameScene extends Phaser.Scene {
   create(){
     this.physics.world.setBounds(0,0,1800,1100); this.cameras.main.setBounds(0,0,1800,1100).setBackgroundColor(this.level.floorColor);
     this.buildDungeon();
-    this.player=this.physics.add.sprite(160,550,this.hero.id).setDepth(5).setCollideWorldBounds(true); this.player.setCircle(19,5,5);
-    this.moxie=this.physics.add.sprite(105,600,'moxie').setScale(.9).setDepth(5).setCollideWorldBounds(true);
+    this.player=this.physics.add.sprite(160,550,`portrait-${this.hero.id}`).setDisplaySize(54,54).setDepth(5).setCollideWorldBounds(true);
+    this.player.body!.setSize(38,38,true);
+    this.moxie=this.physics.add.sprite(105,600,'moxie').setDisplaySize(48,48).setDepth(5).setCollideWorldBounds(true);
+    this.moxie.body!.setSize(34,34,true);
     this.enemies=this.physics.add.group();this.shots=this.physics.add.group();this.loot=this.physics.add.group();
     this.maxHp=70+this.save.stats.grit*8;this.hp=this.maxHp;this.moxieHp=45+this.save.moxieBond*8;
     this.required=Math.min(6+this.level.id,14); for(let i=0;i<this.required;i++)this.spawnEnemy(false);
@@ -166,7 +168,7 @@ class GameScene extends Phaser.Scene {
     this.cameras.main.startFollow(this.player,true,.09,.09); this.cameras.main.setZoom(1);
     this.cursors=this.input.keyboard!.createCursorKeys();this.keys=this.input.keyboard!.addKeys('W,A,S,D,E,Q,SPACE,SHIFT') as Record<string,Phaser.Input.Keyboard.Key>;
     this.createHud(); this.createTouchControls(); this.showLevelCard();
-    this.input.on('pointerdown',(p:Phaser.Input.Pointer)=>{if(p.x>W*.42&&p.y<H*.82)this.attack(p.worldX,p.worldY)});
+    this.input.on('pointerdown',(p:Phaser.Input.Pointer,over:Phaser.GameObjects.GameObject[])=>{if(over.length===0&&p.x>W*.42)this.attack(p.worldX,p.worldY)});
     this.time.addEvent({delay:14000,loop:true,callback:()=>this.ledgerSay(Phaser.Utils.Array.GetRandom(this.ledgerLines))});
   }
   buildDungeon(){
@@ -201,7 +203,7 @@ class GameScene extends Phaser.Scene {
     const cols=[225,675,1125,1575],rows=[170,530,900];
     return {x:cols[Math.floor(Math.random()*cols.length)]+Phaser.Math.Between(-105,105),y:rows[Math.floor(Math.random()*rows.length)]+Phaser.Math.Between(-85,85)};
   }
-  spawnEnemy(boss:boolean){const p=this.randomOpen();const e=this.enemies.create(p.x,p.y,boss?'boss':'enemy') as Enemy;e.setDepth(4).setCircle(19,5,5);e.boss=boss;e.maxHp=boss?160+this.level.id*38:24+this.level.id*5;e.hp=e.maxHp;e.speed=boss?55+this.level.id:62+this.level.id*2;e.setScale(boss?1.55:.88);}
+  spawnEnemy(boss:boolean){const p=this.randomOpen();const e=this.enemies.create(p.x,p.y,boss?'boss':'enemy') as Enemy;e.setDisplaySize(boss?76:46,boss?76:46).setDepth(4);e.body!.setSize(boss?58:34,boss?58:34,true);e.boss=boss;e.maxHp=boss?160+this.level.id*38:24+this.level.id*5;e.hp=e.maxHp;e.speed=boss?55+this.level.id:62+this.level.id*2;}
   createHud(){
     this.add.rectangle(0,0,W,82,0x071112,.88).setOrigin(0).setScrollFactor(0).setDepth(20);
     this.add.text(24,14,`${this.hero.name.toUpperCase()}  •  RANK ${this.save.rank}`,{fontSize:'18px',fontStyle:'bold',color:C.paper}).setScrollFactor(0).setDepth(22);
@@ -214,13 +216,16 @@ class GameScene extends Phaser.Scene {
     this.ledgerText=this.add.text(W/2,H-34,'',{fontFamily:'monospace',fontSize:'14px',color:'#efd184',align:'center'}).setOrigin(.5).setScrollFactor(0).setDepth(25).setAlpha(0);
   }
   createTouchControls(){
-    if(!this.sys.game.device.input.touch)return;
-    const base=this.add.circle(110,H-108,72,0x0c1719,.55).setStrokeStyle(2,0x7e9691,.6).setScrollFactor(0).setDepth(30).setInteractive();
-    const nub=this.add.circle(110,H-108,29,0x9bb4ae,.45).setScrollFactor(0).setDepth(31);
-    const reset=()=>{this.touchMove={x:0,y:0};nub.setPosition(110,H-108)};
-    base.on('pointermove',(p:Phaser.Input.Pointer)=>{if(!p.isDown)return;const v=new Phaser.Math.Vector2(p.x-110,p.y-(H-108));if(v.length()>58)v.setLength(58);nub.setPosition(110+v.x,H-108+v.y);this.touchMove={x:v.x/58,y:v.y/58};}).on('pointerup',reset).on('pointerout',reset);
+    const touch=this.sys.game.device.input.touch;
+    if(touch){
+      const base=this.add.circle(110,H-108,72,0x0c1719,.55).setStrokeStyle(2,0x7e9691,.6).setScrollFactor(0).setDepth(30).setInteractive();
+      const nub=this.add.circle(110,H-108,29,0x9bb4ae,.45).setScrollFactor(0).setDepth(31);
+      const reset=()=>{this.touchMove={x:0,y:0};nub.setPosition(110,H-108)};
+      base.on('pointermove',(p:Phaser.Input.Pointer)=>{if(!p.isDown)return;const v=new Phaser.Math.Vector2(p.x-110,p.y-(H-108));if(v.length()>58)v.setLength(58);nub.setPosition(110+v.x,H-108+v.y);this.touchMove={x:v.x/58,y:v.y/58};}).on('pointerup',reset).on('pointerout',reset);
+    }
     const tbtn=(x:number,y:number,r:number,label:string,fn:()=>void)=>{const b=this.add.circle(x,y,r,0x162528,.65).setStrokeStyle(2,0xe6ad52,.8).setScrollFactor(0).setDepth(30).setInteractive();this.add.text(x,y,label,{fontSize:'12px',fontStyle:'bold',color:C.paper,align:'center'}).setOrigin(.5).setScrollFactor(0).setDepth(31);b.on('pointerdown',fn);};
     tbtn(W-92,H-112,50,'ATTACK',()=>this.mobileAttack());tbtn(W-205,H-78,39,'DODGE',()=>this.dodge());tbtn(W-194,H-177,39,'SKILL',()=>this.skill());tbtn(W-292,H-122,34,'DOG',()=>this.commandMoxie());
+    if(!touch)this.add.text(W-430,91,'CLICK/SPACE: ATTACK  •  SHIFT: DODGE  •  E: SKILL  •  Q: MOXIE',{fontFamily:'monospace',fontSize:'11px',color:'#c7d2ce'}).setScrollFactor(0).setDepth(31);
   }
   showLevelCard(){
     this.physics.pause();const shade=this.add.rectangle(W/2,H/2,W,H,0x061011,.9).setScrollFactor(0).setDepth(50);
