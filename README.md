@@ -24,6 +24,8 @@ Open the local address shown by Vite. Desktop controls are WASD or arrow keys to
 
 ## Production status
 
-This build provides the full playable campaign framework and a mechanically complete vertical slice. The twenty sectors are data-driven and playable, while future art batches can replace the procedural entity textures and expand environment-specific mechanics without changing the core interfaces.
+This build provides the full playable campaign framework and a polished systems prototype. The twenty sectors are data-driven and playable, while future releases will deepen the first three levels into a complete vertical slice before expanding unique mechanics across the remaining campaign.
+
+See [DEVELOPMENT_PLAN.md](DEVELOPMENT_PLAN.md) for completed milestones, known limitations, current priorities, and the next planned release.
 
 Run `npm test` for campaign-data validation and `npm run build` for a production build.
