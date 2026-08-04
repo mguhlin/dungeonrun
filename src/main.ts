@@ -284,7 +284,20 @@ class GameScene extends Phaser.Scene {
   }
   showEnding(old:Phaser.GameObjects.GameObject[]){old.forEach(o=>o.destroy());this.add.rectangle(W/2,H/2,W,H,0x071112,.97).setScrollFactor(0).setDepth(80);this.add.text(W/2,80,'THE UNDERWORKS OFFERS THREE EXITS',{fontSize:'35px',fontStyle:'bold',color:C.paper}).setOrigin(.5).setScrollFactor(0).setDepth(81);['ESCAPE — Take Moxie home and seal the door.','CONTROL — Become the foreman the machine fears.','DESTROY — Free every stolen memory, whatever it costs.'].forEach((s,i)=>{const b=button(this,W/2,230+i*115,650,65,s,()=>this.ending(s.split(' — ')[0]));b.setScrollFactor(0).setDepth(82);});}
   ending(choice:string){this.children.removeAll();this.add.rectangle(W/2,H/2,W,H,0x071112);this.add.text(W/2,170,choice,{fontSize:'72px',fontStyle:'bold',color:C.amber}).setOrigin(.5);this.add.text(W/2,285,choice==='ESCAPE'?'Morning returns to Split Pine. Moxie finds the first patch of sunlight.':choice==='CONTROL'?'The Ledger stutters as a new foreman signs in. The first new rule: dogs outrank machines.':'The dungeon opens like a clenched fist. Millions of stolen stories rush toward the sky.',{fontFamily:'Georgia,serif',fontSize:'28px',color:C.paper,align:'center',wordWrap:{width:780}}).setOrigin(.5);button(this,W/2,560,300,55,'RETURN TO TITLE',()=>this.scene.start('title'));}
-  gameOver(){this.completed=true;this.physics.pause();const shade=this.add.rectangle(W/2,H/2,W,H,0x120708,.9).setScrollFactor(0).setDepth(90);const t=this.add.text(W/2,210,'PERFORMANCE REVIEW: INCONCLUSIVE',{fontSize:'34px',fontStyle:'bold',color:'#ef826d'}).setOrigin(.5).setScrollFactor(0).setDepth(91);const b=button(this,W/2,355,300,58,'RETRY CHECKPOINT',()=>this.scene.restart({save:this.save}));b.setScrollFactor(0).setDepth(92);const q=button(this,W/2,440,300,50,'SAVE AND QUIT',()=>this.scene.start('title'));q.setScrollFactor(0).setDepth(92);}
+  gameOver(){
+    this.completed=true;this.physics.pause();
+    this.add.rectangle(W/2,H/2,W,H,0x120708,.94).setScrollFactor(0).setDepth(90);
+    this.add.text(W/2,210,'PERFORMANCE REVIEW: INCONCLUSIVE',{fontSize:'34px',fontStyle:'bold',color:'#ef826d'}).setOrigin(.5).setScrollFactor(0).setDepth(91);
+    const direct=(y:number,h:number,label:string,action:()=>void)=>{
+      const bg=this.add.rectangle(W/2,y,320,h,0x172325,.98).setStrokeStyle(3,0xe6ad52).setScrollFactor(0).setDepth(93).setInteractive({useHandCursor:true});
+      this.add.text(W/2,y,label,{fontSize:'20px',fontStyle:'bold',color:C.paper}).setOrigin(.5).setScrollFactor(0).setDepth(94);
+      let used=false;bg.on('pointerover',()=>bg.setFillStyle(0x294044)).on('pointerout',()=>bg.setFillStyle(0x172325)).on('pointerdown',()=>{if(used)return;used=true;action();});
+    };
+    const retry=()=>{this.physics.resume();this.scene.restart({save:this.save});};
+    const quit=()=>{writeSave(this.save);this.physics.resume();this.scene.start('title');};
+    direct(355,60,'RETRY CHECKPOINT  [R]',retry);direct(440,54,'SAVE AND QUIT  [ESC]',quit);
+    this.input.keyboard?.once('keydown-R',retry);this.input.keyboard?.once('keydown-ESC',quit);
+  }
   announce(msg:string){this.status.setText(msg);this.time.delayedCall(2600,()=>this.status.setText(''));}
   ledgerSay(msg:string){if(!this.ledgerText?.active)return;this.tweens.killTweensOf([this.ledgerBox,this.ledgerText]);this.ledgerText.setText(msg).setAlpha(1);this.ledgerBox.setAlpha(1);this.time.delayedCall(4300,()=>{if(!this.ledgerText?.active)return;this.tweens.add({targets:[this.ledgerBox,this.ledgerText],alpha:0,duration:500});});}
   floatText(x:number,y:number,msg:string,color:string){const t=this.add.text(x,y,msg,{fontSize:'14px',fontStyle:'bold',color}).setOrigin(.5).setDepth(10);this.tweens.add({targets:t,y:y-35,alpha:0,duration:700,onComplete:()=>t.destroy()});}
