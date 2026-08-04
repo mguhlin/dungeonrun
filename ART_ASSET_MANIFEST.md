@@ -32,10 +32,11 @@ Original graphic-novel 2D illustration with bold ink contours, painterly industr
 ### Player-supplied Moxie photograph
 
 - **Production file:** `public/assets/moxie-photo.png`
-- **Original source:** `source-art/moxie-white-poodle-original.png`
+- **Current original source:** `source-art/moxie-white-poodle-painted-original.png`
+- **Earlier source:** `source-art/moxie-white-poodle-original.png`
 - **Use:** Current gameplay sprite for Moxie
-- **Treatment:** Center-cropped and reduced to 256 × 256 for browser performance; no generative changes
-- **Identity note:** This white standard poodle photograph supersedes the generated black-poodle medallion during gameplay. The generated image remains archived as early concept art.
+- **Treatment:** Center-cropped and reduced to 256 × 256 for browser performance
+- **Identity note:** The newer painted white-poodle portrait supersedes both the earlier white-poodle photograph and generated black-poodle medallion during gameplay. Both earlier images remain archived as source or concept art.
 
 ## Planned generation batches
 

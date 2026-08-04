@@ -44,7 +44,7 @@ The current release is best described as a polished systems prototype and campai
 
 - Original graphic-novel title artwork
 - Canonical selection portraits for Bud, Erin, and Gin
-- Player-supplied white-poodle photograph used for Moxie during gameplay
+- Player-supplied painted white-poodle portrait used for Moxie during gameplay
 - Generated fierce-creature and boss gameplay medallions
 - Optimized browser-ready image sizes with original source art preserved
 - Character-selection layout corrected to avoid portrait/name and text/card overlap
@@ -62,7 +62,7 @@ The current release is best described as a polished systems prototype and campai
 
 - Common enemies currently share one creature medallion, and bosses share one boss medallion
 - Hero gameplay pieces use portrait icons rather than animated top-down sprites
-- Moxie uses a photo icon rather than an animated top-down poodle sprite
+- Moxie uses a painted portrait icon rather than an animated top-down poodle sprite
 - Level-specific mechanics are described in the campaign data but many still use the shared combat implementation
 - Dungeon layouts are denser and connected, but they are generated from one common structural pattern
 - Enemy behavior is primarily chase-and-contact combat; boss behavior adds a ranged spread but is not yet unique per boss
