@@ -91,19 +91,19 @@ class SelectScene extends Phaser.Scene {
     this.add.rectangle(W/2,H/2,W,H,0x0b1517);
     this.add.text(W/2,44,'CHOOSE THE FOREMAN',{fontSize:'42px',fontStyle:'bold',color:C.paper}).setOrigin(.5);
     this.add.text(W/2,92,'Same hard-earned history. Different way through the dark.',{fontSize:'19px',color:'#a9bbb5'}).setOrigin(.5);
-    HEROES.forEach((hero,i)=>this.card(hero,210+i*430,315));
+    HEROES.forEach((hero,i)=>this.card(hero,210+i*430,325));
     this.add.text(W/2,660,'Each run includes Moxie, a full-size standard poodle with excellent judgment.',{fontSize:'17px',color:C.amber}).setOrigin(.5);
   }
   card(hero:HeroDefinition,x:number,y:number){
-    const panel=this.add.rectangle(x,y,360,410,0x142124).setStrokeStyle(3,hero.color).setInteractive({useHandCursor:true});
-    this.add.circle(x,y-132,80,hero.color,.92).setStrokeStyle(4,0xefe6ce,.85);
-    const portrait=this.add.image(x,y-132,`portrait-${hero.id}`).setDisplaySize(146,146);
+    const panel=this.add.rectangle(x,y,360,470,0x142124).setStrokeStyle(3,hero.color).setInteractive({useHandCursor:true});
+    this.add.circle(x,y-140,80,hero.color,.92).setStrokeStyle(4,0xefe6ce,.85);
+    const portrait=this.add.image(x,y-140,`portrait-${hero.id}`).setDisplaySize(146,146);
     const maskShape=this.make.graphics({x:0,y:0});
-    maskShape.fillStyle(0xffffff).fillCircle(x,y-132,72);
+    maskShape.fillStyle(0xffffff).fillCircle(x,y-140,72);
     portrait.setMask(maskShape.createGeometryMask());
-    this.add.text(x,y-62,hero.name.toUpperCase(),{fontSize:'34px',fontStyle:'bold',color:C.paper}).setOrigin(.5);
-    this.add.text(x,y-20,hero.title,{fontSize:'20px',color:'#e6ad52'}).setOrigin(.5);
-    this.add.text(x-148,y+20,`MIGHT ${hero.stats.might}   GRIT ${hero.stats.grit}\nAGILITY ${hero.stats.agility}  AWARENESS ${hero.stats.awareness}\nINGENUITY ${hero.stats.ingenuity}  RESOLVE ${hero.stats.resolve}\n\n${hero.skill}\n${hero.skillDescription}`,{fontSize:'16px',color:'#cad4ce',wordWrap:{width:296},lineSpacing:8});
+    this.add.text(x,y-43,hero.name.toUpperCase(),{fontSize:'31px',fontStyle:'bold',color:C.paper}).setOrigin(.5);
+    this.add.text(x,y-3,hero.title,{fontSize:'20px',color:'#e6ad52'}).setOrigin(.5);
+    this.add.text(x-148,y+36,`MIGHT ${hero.stats.might}   GRIT ${hero.stats.grit}\nAGILITY ${hero.stats.agility}  AWARENESS ${hero.stats.awareness}\nINGENUITY ${hero.stats.ingenuity}  RESOLVE ${hero.stats.resolve}\n\n${hero.skill}\n${hero.skillDescription}`,{fontSize:'15px',color:'#cad4ce',wordWrap:{width:296},lineSpacing:5});
     panel.on('pointerover',()=>panel.setFillStyle(0x203337)).on('pointerout',()=>panel.setFillStyle(0x142124)).on('pointerdown',()=>this.choose(hero));
   }
   choose(hero:HeroDefinition){
