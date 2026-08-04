@@ -29,6 +29,14 @@ Original graphic-novel 2D illustration with bold ink contours, painterly industr
 - **Prompt summary:** High-contrast icons readable at small size: an original snarling timber-and-iron common creature on crimson, a larger blade-crowned mechanical boss on gold and crimson, and Moxie as the same black standard poodle with red bandana on warm ivory; no words, gore, watermarks, or franchise resemblance
 - **Optimization:** Portraits normalized to 512 × 512 and gameplay medallions to 256 × 256 for browser performance
 
+### Player-supplied Moxie photograph
+
+- **Production file:** `public/assets/moxie-photo.png`
+- **Original source:** `source-art/moxie-white-poodle-original.png`
+- **Use:** Current gameplay sprite for Moxie
+- **Treatment:** Center-cropped and reduced to 256 × 256 for browser performance; no generative changes
+- **Identity note:** This white standard poodle photograph supersedes the generated black-poodle medallion during gameplay. The generated image remains archived as early concept art.
+
 ## Planned generation batches
 
 1. Transparent top-down gameplay poses for each protagonist and Moxie

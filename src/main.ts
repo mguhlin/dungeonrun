@@ -23,7 +23,7 @@ class BootScene extends Phaser.Scene {
     this.load.image('portrait-gin','assets/portrait-gin.png');
     this.load.image('enemy','assets/enemy-icon.png');
     this.load.image('boss','assets/boss-icon.png');
-    this.load.image('moxie','assets/moxie-icon.png');
+    this.load.image('moxie','assets/moxie-photo.png');
   }
   create(){
     const make=(key:string,color:number,shape:'circle'|'rect'='circle')=>{if(this.textures.exists(key))return;const g=this.make.graphics({x:0,y:0});g.fillStyle(color);shape==='circle'?g.fillCircle(24,24,20):g.fillRoundedRect(4,4,40,40,7);g.lineStyle(3,0xefe6ce,.75);shape==='circle'?g.strokeCircle(24,24,20):g.strokeRoundedRect(4,4,40,40,7);g.generateTexture(key,48,48);g.destroy();};
