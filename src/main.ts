@@ -150,7 +150,26 @@ class GameScene extends Phaser.Scene {
     const t=this.add.text(W/2,122,`LEVEL ${this.level.id}\n${this.level.title.toUpperCase()}`,{fontSize:'43px',fontStyle:'bold',color:C.paper,align:'center'}).setOrigin(.5).setScrollFactor(0).setDepth(51);
     const s=this.add.text(W/2,244,this.level.story,{fontFamily:'Georgia,serif',fontSize:'24px',color:'#d9d7c9',align:'center',wordWrap:{width:820},lineSpacing:10}).setOrigin(.5,0).setScrollFactor(0).setDepth(51);
     const m=this.add.text(W/2,410,`NEW PRESSURE: ${this.level.mechanic}\nOBJECTIVE: ${this.level.objective}`,{fontFamily:'monospace',fontSize:'18px',color:C.amber,align:'center'}).setOrigin(.5).setScrollFactor(0).setDepth(51);
-    const go=button(this,W/2,584,260,54,'ENTER SECTOR',()=>{[shade,t,s,m,go].forEach(o=>o.destroy());this.physics.resume();});go.setScrollFactor(0).setDepth(52);
+    // Keep the modal action as direct scene objects. Interactive children inside
+    // containers can lose their hit area after camera scrolling on some touch
+    // browsers, which made the first sector appear locked.
+    const goBg=this.add.rectangle(W/2,584,300,60,0x172325,.98)
+      .setStrokeStyle(3,0xe6ad52).setScrollFactor(0).setDepth(53)
+      .setInteractive({useHandCursor:true});
+    const goText=this.add.text(W/2,584,'ENTER SECTOR',{fontSize:'22px',fontStyle:'bold',color:C.paper})
+      .setOrigin(.5).setScrollFactor(0).setDepth(54);
+    let entering=false;
+    const enter=()=>{
+      if(entering)return;
+      entering=true;
+      [shade,t,s,m,goBg,goText].forEach(o=>o.destroy());
+      this.physics.resume();
+      this.player.setVelocity(0);
+    };
+    goBg.on('pointerover',()=>goBg.setFillStyle(0x294044))
+      .on('pointerout',()=>goBg.setFillStyle(0x172325))
+      .on('pointerdown',enter);
+    this.input.keyboard?.once('keydown-ENTER',enter);
   }
   update(time:number){
     if(this.completed)return;let x=0,y=0;if(this.cursors.left.isDown||this.keys.A.isDown)x--;if(this.cursors.right.isDown||this.keys.D.isDown)x++;if(this.cursors.up.isDown||this.keys.W.isDown)y--;if(this.cursors.down.isDown||this.keys.S.isDown)y++;x+=this.touchMove.x;y+=this.touchMove.y;const v=new Phaser.Math.Vector2(x,y);if(v.length()>0)v.normalize().scale(160+this.save.stats.agility*4);this.player.setVelocity(v.x,v.y);
