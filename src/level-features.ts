@@ -29,7 +29,9 @@ export const SPECIAL_LEVELS:Record<SpecialLevelId,SpecialLevelPlan> = {
     walls:[...border,
       {x:310,y:780,w:500,h:34},{x:580,y:650,w:34,h:290},{x:810,y:510,w:490,h:34},
       {x:1070,y:690,w:34,h:395},{x:1300,y:380,w:500,h:34},{x:1450,y:760,w:520,h:34},
-      {x:1510,y:95,w:390,h:30},{x:1690,y:220,w:30,h:280},{x:1510,y:345,w:390,h:30},{x:1330,y:220,w:30,h:280},
+      {x:1510,y:95,w:390,h:30},{x:1690,y:220,w:30,h:280},{x:1510,y:345,w:390,h:30},
+      // Split the holding-room west wall to leave a visible, player-width doorway to Moxie.
+      {x:1330,y:125,w:30,h:30},{x:1330,y:270,w:30,h:120},
       {x:410,y:250,w:250,h:30},{x:760,y:185,w:30,h:250}],
     hazards:[{x:455,y:870,w:95,h:95},{x:880,y:625,w:95,h:95},{x:1225,y:465,w:95,h:95},{x:1430,y:880,w:95,h:95}],
     targets:[{x:390,y:650},{x:890,y:410},{x:1260,y:880}]

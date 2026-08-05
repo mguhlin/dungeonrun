@@ -23,4 +23,27 @@ describe('level 1–3 feature plans', () => {
     const signatures=Object.values(SPECIAL_LEVELS).map(plan=>JSON.stringify(plan.walls));
     expect(new Set(signatures).size).toBe(3);
   });
+
+  it('keeps a traversable route from the level 1 start to Moxie', () => {
+    const plan=SPECIAL_LEVELS[1];
+    const step=10, clearance=20;
+    const key=(x:number,y:number)=>`${x},${y}`;
+    const blocked=(x:number,y:number)=>plan.walls.some(w =>
+      x >= w.x-w.w/2-clearance && x <= w.x+w.w/2+clearance &&
+      y >= w.y-w.h/2-clearance && y <= w.y+w.h/2+clearance
+    );
+    const snap=(n:number)=>Math.round(n/step)*step;
+    const start={x:snap(plan.playerStart.x),y:snap(plan.playerStart.y)};
+    const goal={x:snap(plan.moxieStart.x),y:snap(plan.moxieStart.y)};
+    const queue=[start], visited=new Set([key(start.x,start.y)]);
+    for(let i=0;i<queue.length;i++){
+      const p=queue[i];
+      for(const [dx,dy] of [[step,0],[-step,0],[0,step],[0,-step]]){
+        const x=p.x+dx,y=p.y+dy,k=key(x,y);
+        if(x<clearance||x>1800-clearance||y<clearance||y>1100-clearance||blocked(x,y)||visited.has(k))continue;
+        visited.add(k);queue.push({x,y});
+      }
+    }
+    expect(visited.has(key(goal.x,goal.y))).toBe(true);
+  });
 });
