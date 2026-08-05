@@ -142,7 +142,7 @@ class GameScene extends Phaser.Scene {
   hpBar!:Phaser.GameObjects.Graphics; mini!:Phaser.GameObjects.Graphics; status!:Phaser.GameObjects.Text; objective!:Phaser.GameObjects.Text; touchMove={x:0,y:0}; touchAttack=false;
   wallRects:Array<{x:number;y:number;w:number;h:number}>=[];
   ledgerBox!:Phaser.GameObjects.Rectangle; ledgerText!:Phaser.GameObjects.Text; lowHealthCommented=false;
-  featureProgress=0; moxieRescued=true; nextHazardDamage=0; bossPhase=1; bossStartedAt=0; terminalUsed=false; rangedBoost=0;
+  featureProgress=0; moxieRescued=true; nextHazardDamage=0; nextMoxieCall=0; bossPhase=1; bossStartedAt=0; terminalUsed=false; rangedBoost=0;
   ledgerLines=[
     'THE LEDGER: Running is encouraged. It improves the flavor of the panic.',
     'THE LEDGER: Your survival remains statistically inconvenient.',
@@ -323,7 +323,20 @@ class GameScene extends Phaser.Scene {
     else if(d<420&&time>(e.nextShot??0)){e.nextShot=time+1600;this.hostileShot(e,3,.28,190);}
   }
   hostileShot(e:Enemy,count=3,spread=.28,speed=190){const angle=Phaser.Math.Angle.Between(e.x,e.y,this.player.x,this.player.y);for(let n=0;n<count;n++){const offset=(n-(count-1)/2)*spread;const orb=this.physics.add.image(e.x,e.y,'shot').setTint(0xef685f).setScale(.45).setDepth(4);this.physics.velocityFromRotation(angle+offset,speed,orb.body!.velocity);this.time.delayedCall(2400,()=>orb.active&&orb.destroy());this.physics.add.overlap(this.player,orb,()=>{orb.destroy();this.damage(12+this.level.id)});}}
-  updateMoxie(time:number){if(!this.moxieRescued){this.moxie.setVelocity(0);return;}if(this.moxieHp<=0){this.moxie.setAlpha(.25).setVelocity(0);return;}this.moxie.setAlpha(1);let target:Enemy|null=null,dist=260;this.enemies.children.each(o=>{const e=o as Enemy;const d=Phaser.Math.Distance.Between(this.moxie.x,this.moxie.y,e.x,e.y);if(d<dist){dist=d;target=e}return true;});if(target){this.physics.moveToObject(this.moxie,target,150);if(dist<58&&time>this.nextMoxieAttack){this.nextMoxieAttack=time+850;(target as Enemy).hp-=7+this.save.moxieBond*2;this.floatText((target as Enemy).x,(target as Enemy).y-30,'WOOF!',C.teal);if((target as Enemy).hp<=0)this.killEnemy(target as Enemy);}}else{const d=Phaser.Math.Distance.Between(this.moxie.x,this.moxie.y,this.player.x,this.player.y);if(d>95)this.physics.moveToObject(this.moxie,this.player,175);else this.moxie.setVelocity(0);}}
+  updateMoxie(time:number){
+    if(!this.moxieRescued){
+      // Keep Moxie visibly active while captive without allowing companion combat
+      // to bypass the rescue objective. She paces inside the holding room and
+      // calls out so the player can locate the newly opened doorway.
+      const direction=this.moxie.getData('paceDirection')??-1;
+      if(this.moxie.x<1450)this.moxie.setData('paceDirection',1);
+      else if(this.moxie.x>1600)this.moxie.setData('paceDirection',-1);
+      this.moxie.setVelocity((this.moxie.getData('paceDirection')??direction)*42,0);
+      if(time>this.nextMoxieCall){this.nextMoxieCall=time+3800;this.floatText(this.moxie.x,this.moxie.y-34,'WOOF!',C.teal);}
+      return;
+    }
+    if(this.moxieHp<=0){this.moxie.setAlpha(.25).setVelocity(0);return;}
+    this.moxie.setAlpha(1);let target:Enemy|null=null,dist=260;this.enemies.children.each(o=>{const e=o as Enemy;const d=Phaser.Math.Distance.Between(this.moxie.x,this.moxie.y,e.x,e.y);if(d<dist){dist=d;target=e}return true;});if(target){this.physics.moveToObject(this.moxie,target,150);if(dist<58&&time>this.nextMoxieAttack){this.nextMoxieAttack=time+850;(target as Enemy).hp-=7+this.save.moxieBond*2;this.floatText((target as Enemy).x,(target as Enemy).y-30,'WOOF!',C.teal);if((target as Enemy).hp<=0)this.killEnemy(target as Enemy);}}else{const d=Phaser.Math.Distance.Between(this.moxie.x,this.moxie.y,this.player.x,this.player.y);if(d>95)this.physics.moveToObject(this.moxie,this.player,175);else this.moxie.setVelocity(0);}}
   attack(x:number,y:number){if(this.time.now<this.lastAttack+320)return;this.lastAttack=this.time.now;const a=Phaser.Math.Angle.Between(this.player.x,this.player.y,x,y);const s=this.shots.create(this.player.x,this.player.y,'shot') as Phaser.Physics.Arcade.Sprite;s.setScale(.35).setTint(this.hero.color).setDepth(6);this.physics.velocityFromRotation(a,430,s.body!.velocity);this.time.delayedCall(850,()=>s.destroy());}
   inHazard(){return !!this.feature?.hazards.some(r=>Math.abs(this.player.x-r.x)<r.w/2&&Math.abs(this.player.y-r.y)<r.h/2);}
   touchHazard(_h:Phaser.Physics.Arcade.Sprite){
