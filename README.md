@@ -17,14 +17,14 @@ Open the local address shown by Vite. Desktop controls are WASD or arrow keys to
 
 - Bud, Erin, and Gin as mechanically distinct selectable protagonists
 - Moxie as an active AI companion with combat and revival behavior
-- Twenty story-driven levels with original environments, creatures, bosses, and objectives
+- Twenty story-driven levels, including handcrafted layouts and distinct objectives, hazards, enemy behavior, and phased bosses for Levels 1–3
 - Real-time combat, minimap, health and stamina bars, loot, ranks, achievements, rest areas, bathroom humor, checkpoint saving, and three endings
 - Responsive desktop and mobile presentation
 - Original generated graphic-novel key art with code-generated fallback game textures
 
 ## Production status
 
-This build provides the full playable campaign framework and a polished systems prototype. The twenty sectors are data-driven and playable, while future releases will deepen the first three levels into a complete vertical slice before expanding unique mechanics across the remaining campaign.
+This build provides the full playable campaign framework and a polished systems prototype. The twenty sectors are data-driven and playable; Levels 1–3 now have authored maps and mechanics, while future releases will polish their art and testing before expanding the same depth across Levels 4–20.
 
 See [DEVELOPMENT_PLAN.md](DEVELOPMENT_PLAN.md) for completed milestones, known limitations, current priorities, and the next planned release.
 

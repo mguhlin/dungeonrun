@@ -1,6 +1,8 @@
 import Phaser from 'phaser';
 import './style.css';
 import { HEROES, LEVELS } from './data';
+import { getSpecialLevel } from './level-features';
+import type { SpecialLevelPlan } from './level-features';
 import { clearSave, loadSave, newSave, writeSave } from './save';
 import type { HeroDefinition, SaveGame } from './types';
 
@@ -129,15 +131,18 @@ class StoryScene extends Phaser.Scene {
   }
 }
 
-type Enemy = Phaser.Physics.Arcade.Sprite & { hp:number; maxHp:number; speed:number; boss?:boolean; nextShot?:number };
+type Enemy = Phaser.Physics.Arcade.Sprite & { hp:number; maxHp:number; speed:number; boss?:boolean; nextShot?:number; archetype?:0|1 };
+type FeatureTarget = Phaser.Physics.Arcade.Sprite & { hp:number; index:number };
 
 class GameScene extends Phaser.Scene {
   save!:SaveGame; hero!:HeroDefinition; level=LEVELS[0]; player!:Phaser.Physics.Arcade.Sprite; moxie!:Phaser.Physics.Arcade.Sprite;
   enemies!:Phaser.Physics.Arcade.Group; shots!:Phaser.Physics.Arcade.Group; loot!:Phaser.Physics.Arcade.Group; walls!:Phaser.Physics.Arcade.StaticGroup;
+  featureTargets!:Phaser.Physics.Arcade.StaticGroup; hazards!:Phaser.Physics.Arcade.StaticGroup; terminals!:Phaser.Physics.Arcade.StaticGroup; feature?:SpecialLevelPlan;
   cursors!:Phaser.Types.Input.Keyboard.CursorKeys; keys!:Record<string,Phaser.Input.Keyboard.Key>; hp=100; maxHp=100; stamina=100; moxieHp=60; kills=0; required=0; bossSpawned=false; completed=false; lastAttack=0; lastSkill=0; nextMoxieAttack=0; revived=false;
   hpBar!:Phaser.GameObjects.Graphics; mini!:Phaser.GameObjects.Graphics; status!:Phaser.GameObjects.Text; objective!:Phaser.GameObjects.Text; touchMove={x:0,y:0}; touchAttack=false;
   wallRects:Array<{x:number;y:number;w:number;h:number}>=[];
   ledgerBox!:Phaser.GameObjects.Rectangle; ledgerText!:Phaser.GameObjects.Text; lowHealthCommented=false;
+  featureProgress=0; moxieRescued=true; nextHazardDamage=0; bossPhase=1; bossStartedAt=0; terminalUsed=false; rangedBoost=0;
   ledgerLines=[
     'THE LEDGER: Running is encouraged. It improves the flavor of the panic.',
     'THE LEDGER: Your survival remains statistically inconvenient.',
@@ -149,22 +154,30 @@ class GameScene extends Phaser.Scene {
     'THE LEDGER: Management noticed you are still alive. Policy review pending.'
   ];
   constructor(){super('game')}
-  init(data:{save:SaveGame}){this.save=data.save;this.hero=HEROES.find(h=>h.id===this.save.heroId)!;this.level=LEVELS[this.save.level-1]??LEVELS[0];}
+  init(data:{save:SaveGame}){this.save=data.save;this.hero=HEROES.find(h=>h.id===this.save.heroId)!;this.level=LEVELS[this.save.level-1]??LEVELS[0];this.feature=getSpecialLevel(this.level.id);this.featureProgress=0;this.moxieRescued=this.level.id!==1;this.bossPhase=1;this.bossStartedAt=0;this.terminalUsed=false;this.rangedBoost=0;}
   create(){
     this.physics.world.setBounds(0,0,1800,1100); this.cameras.main.setBounds(0,0,1800,1100).setBackgroundColor(this.level.floorColor);
     this.buildDungeon();
-    this.player=this.physics.add.sprite(160,550,`portrait-${this.hero.id}`).setDisplaySize(54,54).setDepth(5).setCollideWorldBounds(true);
+    const start=this.feature?.playerStart??{x:160,y:550};
+    const dogStart=this.feature?.moxieStart??{x:105,y:600};
+    this.player=this.physics.add.sprite(start.x,start.y,`portrait-${this.hero.id}`).setDisplaySize(54,54).setDepth(5).setCollideWorldBounds(true);
     this.player.body!.setSize(38,38,true);
-    this.moxie=this.physics.add.sprite(105,600,'moxie').setDisplaySize(48,48).setDepth(5).setCollideWorldBounds(true);
+    this.moxie=this.physics.add.sprite(dogStart.x,dogStart.y,'moxie').setDisplaySize(48,48).setDepth(5).setCollideWorldBounds(true);
     this.moxie.body!.setSize(34,34,true);
     this.enemies=this.physics.add.group();this.shots=this.physics.add.group();this.loot=this.physics.add.group();
+    this.createLevelFeatures();
     this.maxHp=70+this.save.stats.grit*8;this.hp=this.maxHp;this.moxieHp=45+this.save.moxieBond*8;
-    this.required=Math.min(6+this.level.id,14); for(let i=0;i<this.required;i++)this.spawnEnemy(false);
+    this.required=Math.min(6+this.level.id,14); for(let i=0;i<this.required;i++)this.spawnEnemy(false,i);
     this.physics.add.collider(this.player,this.walls);this.physics.add.collider(this.moxie,this.walls);this.physics.add.collider(this.enemies,this.walls);
     this.physics.add.overlap(this.player,this.enemies,(_,e)=>this.contact(e as Enemy));
     this.physics.add.overlap(this.shots,this.enemies,(s,e)=>this.hitEnemy(s as Phaser.Physics.Arcade.Sprite,e as Enemy));
+    this.physics.add.overlap(this.shots,this.featureTargets,(s,t)=>this.hitFeatureTarget(s as Phaser.Physics.Arcade.Sprite,t as FeatureTarget));
     this.physics.add.overlap(this.player,this.loot,(_,l)=>this.collect(l as Phaser.Physics.Arcade.Sprite));
     this.physics.add.overlap(this.moxie,this.enemies,(_,e)=>this.moxieContact(e as Enemy));
+    this.physics.add.overlap(this.player,this.featureTargets,(_,t)=>this.touchFeatureTarget(t as FeatureTarget));
+    this.physics.add.overlap(this.player,this.hazards,(_,h)=>this.touchHazard(h as Phaser.Physics.Arcade.Sprite));
+    this.physics.add.overlap(this.player,this.terminals,()=>this.useTerminal());
+    if(this.level.id===1)this.physics.add.overlap(this.player,this.moxie,()=>this.rescueMoxie());
     this.cameras.main.startFollow(this.player,true,.09,.09); this.cameras.main.setZoom(1);
     this.cursors=this.input.keyboard!.createCursorKeys();this.keys=this.input.keyboard!.addKeys('W,A,S,D,E,Q,SPACE,SHIFT') as Record<string,Phaser.Input.Keyboard.Key>;
     this.createHud(); this.createTouchControls(); this.showLevelCard();
@@ -176,6 +189,12 @@ class GameScene extends Phaser.Scene {
     const grid=this.add.grid(900,550,1800,1100,64,64,0x000000,0,0xffffff,.035);grid.setDepth(0);
     this.walls=this.physics.add.staticGroup();this.wallRects=[];
     const add=(x:number,y:number,w:number,h:number)=>{this.wallRects.push({x,y,w,h});const r=this.add.rectangle(x,y,w,h,this.level.wallColor).setStrokeStyle(3,0x0a1112,.65);this.physics.add.existing(r,true);this.walls.add(r);};
+    if(this.feature){
+      this.feature.walls.forEach(r=>add(r.x,r.y,r.w,r.h));
+      const labels=this.level.id===1?[[145,1010,'MILL FLOOR'],[1390,55,'MOXIE — HOLD']]:this.level.id===2?[[90,70,'PUMP ACCESS'],[1430,1010,'FLOODGATE']]:[[80,70,'MANDATORY ROUTE'],[1415,1015,'INSPECTION']];
+      labels.forEach(([x,y,label])=>this.add.text(x as number,y as number,label as string,{fontFamily:'monospace',fontSize:'14px',color:'#17130b',backgroundColor:'#d7b25c',padding:{x:8,y:4}}));
+      return;
+    }
     add(900,18,1800,36);add(900,1082,1800,36);add(18,550,36,1100);add(1782,550,36,1100);
     // A connected room-and-corridor plan. Each divider has staggered doorways,
     // producing recognizable chambers without sealing off the route to the boss.
@@ -203,7 +222,36 @@ class GameScene extends Phaser.Scene {
     const cols=[225,675,1125,1575],rows=[170,530,900];
     return {x:cols[Math.floor(Math.random()*cols.length)]+Phaser.Math.Between(-105,105),y:rows[Math.floor(Math.random()*rows.length)]+Phaser.Math.Between(-85,85)};
   }
-  spawnEnemy(boss:boolean){const p=this.randomOpen();const e=this.enemies.create(p.x,p.y,boss?'boss':'enemy') as Enemy;e.setDisplaySize(boss?76:46,boss?76:46).setDepth(4);e.body!.setSize(boss?58:34,boss?58:34,true);e.boss=boss;e.maxHp=boss?160+this.level.id*38:24+this.level.id*5;e.hp=e.maxHp;e.speed=boss?55+this.level.id:62+this.level.id*2;}
+  spawnEnemy(boss:boolean,index=0){const p=boss?(this.level.id<=3?{x:1650,y:145}:this.randomOpen()):(this.feature?.enemySpawns[index%this.feature.enemySpawns.length]??this.randomOpen());const e=this.enemies.create(p.x,p.y,boss?'boss':'enemy') as Enemy;const archetype=(index%2) as 0|1;e.archetype=archetype;e.setDisplaySize(boss?76:archetype?42:50,boss?76:archetype?42:50).setDepth(4);e.body!.setSize(boss?58:archetype?30:38,boss?58:archetype?30:38,true);e.boss=boss;e.maxHp=boss?160+this.level.id*38:(24+this.level.id*5)*(archetype?.78:1.18);e.hp=e.maxHp;e.speed=boss?55+this.level.id:(62+this.level.id*2)*(archetype?1.28:.88);if(!boss&&this.level.id<=3)e.setTint(archetype?this.level.bossColor:0xd9cdb2);if(boss){this.bossStartedAt=this.time.now;this.bossPhase=1;}}
+
+  createLevelFeatures(){
+    this.featureTargets=this.physics.add.staticGroup();
+    this.hazards=this.physics.add.staticGroup();
+    this.terminals=this.physics.add.staticGroup();
+    if(!this.feature)return;
+    this.feature.hazards.forEach((r,i)=>{
+      const color=this.level.id===1?0xc94f3d:this.level.id===2?0x2e7188:0xe6ad52;
+      const h=this.add.rectangle(r.x,r.y,r.w,r.h,color,this.level.id===2?.28:.5).setStrokeStyle(2,color,.9).setDepth(1);
+      h.setData('index',i);this.physics.add.existing(h,true);this.hazards.add(h);
+      if(this.level.id===1)this.tweens.add({targets:h,angle:360,duration:2200+i*180,repeat:-1});
+    });
+    this.feature.targets.forEach((p,index)=>{
+      const t=this.physics.add.sprite(p.x,p.y,'loot') as FeatureTarget;
+      t.index=index;t.hp=this.level.id===3?1:3;t.setDisplaySize(this.level.id===1?70:58,this.level.id===1?54:58).setTint(this.level.id===1?0xa9703c:this.level.id===2?0x55b4cf:0xe6c85a).setDepth(3);
+      t.setData('done',false);this.featureTargets.add(t);
+      this.add.text(p.x,p.y-48,this.level.id===1?'BREAKABLE LUMBER':this.level.id===2?'PUMP CONTROL':'SAFETY SEAL',{fontFamily:'monospace',fontSize:'12px',color:'#f3dfaa',backgroundColor:'#071112aa',padding:{x:5,y:3}}).setOrigin(.5).setDepth(3).setData('targetLabel',index);
+    });
+    if(this.level.id===1){
+      this.moxie.setTint(0x84908c).setAlpha(.55);
+      this.add.rectangle(this.feature.moxieStart.x,this.feature.moxieStart.y,150,150,0x263238,.2).setStrokeStyle(5,0xe6ad52,.8).setDepth(4);
+      this.add.text(this.feature.moxieStart.x,this.feature.moxieStart.y-100,'FIND MOXIE',{fontFamily:'monospace',fontSize:'15px',color:C.amber,backgroundColor:'#071112cc',padding:{x:8,y:4}}).setOrigin(.5).setDepth(6);
+      [{x:660,y:700,w:260,h:46},{x:1190,y:325,w:250,h:46}].forEach(r=>this.add.rectangle(r.x,r.y,r.w,r.h,0xc37a39,.3).setStrokeStyle(2,0xe6ad52,.65).setDepth(1).setData('conveyor',true));
+    }
+    if(this.level.id===3){
+      const terminal=this.physics.add.sprite(680,930,'loot').setDisplaySize(66,66).setTint(0x67b4ad).setDepth(3);
+      this.terminals.add(terminal);this.add.text(680,880,'REST TERMINAL',{fontFamily:'monospace',fontSize:'13px',color:'#b8fff2',backgroundColor:'#071112cc',padding:{x:6,y:3}}).setOrigin(.5);
+    }
+  }
   createHud(){
     this.add.rectangle(0,0,W,82,0x071112,.88).setOrigin(0).setScrollFactor(0).setDepth(20);
     this.add.text(24,14,`${this.hero.name.toUpperCase()}  •  RANK ${this.save.rank}`,{fontSize:'18px',fontStyle:'bold',color:C.paper}).setScrollFactor(0).setDepth(22);
@@ -231,7 +279,8 @@ class GameScene extends Phaser.Scene {
     this.physics.pause();const shade=this.add.rectangle(W/2,H/2,W,H,0x061011,.9).setScrollFactor(0).setDepth(50);
     const t=this.add.text(W/2,122,`LEVEL ${this.level.id}\n${this.level.title.toUpperCase()}`,{fontSize:'43px',fontStyle:'bold',color:C.paper,align:'center'}).setOrigin(.5).setScrollFactor(0).setDepth(51);
     const s=this.add.text(W/2,244,this.level.story,{fontFamily:'Georgia,serif',fontSize:'24px',color:'#d9d7c9',align:'center',wordWrap:{width:820},lineSpacing:10}).setOrigin(.5,0).setScrollFactor(0).setDepth(51);
-    const m=this.add.text(W/2,410,`NEW PRESSURE: ${this.level.mechanic}\nOBJECTIVE: ${this.level.objective}`,{fontFamily:'monospace',fontSize:'18px',color:C.amber,align:'center'}).setOrigin(.5).setScrollFactor(0).setDepth(51);
+    const special=this.level.id===1?'Break lumber piles, cross the conveyors, and reach Moxie.':this.level.id===2?'Shoot three pump controls. Water slows movement; pumps boost ranged attacks.':this.level.id===3?'Collect three seals. Pressure plates hurt both sides; find the rest terminal.':'';
+    const m=this.add.text(W/2,410,`NEW PRESSURE: ${this.level.mechanic}\nOBJECTIVE: ${this.level.objective}${special?`\n\n${special}`:''}`,{fontFamily:'monospace',fontSize:'18px',color:C.amber,align:'center'}).setOrigin(.5).setScrollFactor(0).setDepth(51);
     // Keep the modal action as direct scene objects. Interactive children inside
     // containers can lose their hit area after camera scrolling on some touch
     // browsers, which made the first sector appear locked.
@@ -255,24 +304,64 @@ class GameScene extends Phaser.Scene {
     this.input.keyboard?.once('keydown-ENTER',enter);
   }
   update(time:number){
-    if(this.completed)return;let x=0,y=0;if(this.cursors.left.isDown||this.keys.A.isDown)x--;if(this.cursors.right.isDown||this.keys.D.isDown)x++;if(this.cursors.up.isDown||this.keys.W.isDown)y--;if(this.cursors.down.isDown||this.keys.S.isDown)y++;x+=this.touchMove.x;y+=this.touchMove.y;const v=new Phaser.Math.Vector2(x,y);if(v.length()>0)v.normalize().scale(160+this.save.stats.agility*4);this.player.setVelocity(v.x,v.y);
+    if(this.completed)return;let x=0,y=0;if(this.cursors.left.isDown||this.keys.A.isDown)x--;if(this.cursors.right.isDown||this.keys.D.isDown)x++;if(this.cursors.up.isDown||this.keys.W.isDown)y--;if(this.cursors.down.isDown||this.keys.S.isDown)y++;x+=this.touchMove.x;y+=this.touchMove.y;const v=new Phaser.Math.Vector2(x,y);let moveSpeed=160+this.save.stats.agility*4;if(this.level.id===2&&this.inHazard())moveSpeed*=.55;if(v.length()>0)v.normalize().scale(moveSpeed);this.player.setVelocity(v.x,v.y);
+    if(this.level.id===1&&((this.player.y>675&&this.player.y<725&&this.player.x>530&&this.player.x<790)||(this.player.y>300&&this.player.y<350&&this.player.x>1065&&this.player.x<1315)))this.player.setVelocityX(this.player.body!.velocity.x+55);
     if(Phaser.Input.Keyboard.JustDown(this.keys.SPACE)){const p=this.input.activePointer;this.attack(p.worldX,p.worldY)}if(Phaser.Input.Keyboard.JustDown(this.keys.E))this.skill();if(Phaser.Input.Keyboard.JustDown(this.keys.Q))this.commandMoxie();if(Phaser.Input.Keyboard.JustDown(this.keys.SHIFT))this.dodge();
     this.updateEnemies(time);this.updateMoxie(time);this.drawHud();
   }
-  updateEnemies(time:number){this.enemies.children.each(o=>{const e=o as Enemy;if(!e.active)return true;const d=Phaser.Math.Distance.Between(e.x,e.y,this.player.x,this.player.y);if(d<650)this.physics.moveToObject(e,this.player,e.speed);else e.setVelocity(0);if(e.boss&&d<420&&time>(e.nextShot??0)){e.nextShot=time+1600;this.hostileShot(e);}return true;});}
-  hostileShot(e:Enemy){const angle=Phaser.Math.Angle.Between(e.x,e.y,this.player.x,this.player.y);for(let n=-1;n<=1;n++){const orb=this.physics.add.image(e.x,e.y,'shot').setTint(0xef685f).setScale(.45).setDepth(4);this.physics.velocityFromRotation(angle+n*.28,190,orb.body!.velocity);this.time.delayedCall(2400,()=>orb.destroy());this.physics.add.overlap(this.player,orb,()=>{orb.destroy();this.damage(12+this.level.id)});}}
-  updateMoxie(time:number){if(this.moxieHp<=0){this.moxie.setAlpha(.25).setVelocity(0);return;}this.moxie.setAlpha(1);let target:Enemy|null=null,dist=260;this.enemies.children.each(o=>{const e=o as Enemy;const d=Phaser.Math.Distance.Between(this.moxie.x,this.moxie.y,e.x,e.y);if(d<dist){dist=d;target=e}return true;});if(target){this.physics.moveToObject(this.moxie,target,150);if(dist<58&&time>this.nextMoxieAttack){this.nextMoxieAttack=time+850;(target as Enemy).hp-=7+this.save.moxieBond*2;this.floatText((target as Enemy).x,(target as Enemy).y-30,'WOOF!',C.teal);if((target as Enemy).hp<=0)this.killEnemy(target as Enemy);}}else{const d=Phaser.Math.Distance.Between(this.moxie.x,this.moxie.y,this.player.x,this.player.y);if(d>95)this.physics.moveToObject(this.moxie,this.player,175);else this.moxie.setVelocity(0);}}
+  updateEnemies(time:number){this.enemies.children.each(o=>{const e=o as Enemy;if(!e.active)return true;const d=Phaser.Math.Distance.Between(e.x,e.y,this.player.x,this.player.y);if(d<650)this.physics.moveToObject(e,this.player,e.speed);else e.setVelocity(0);
+      if(!e.boss&&e.archetype===1&&this.level.id===1&&d<430&&time>(e.nextShot??0)){e.nextShot=time+2400;this.hostileShot(e,1,0,180);}
+      if(!e.boss&&e.archetype===1&&this.level.id===2&&d<500&&time>(e.nextShot??0)){e.nextShot=time+2200;this.hostileShot(e,1,.12,165);}
+      if(!e.boss&&e.archetype===0&&this.level.id===3&&d<430&&time>(e.nextShot??0)){e.nextShot=time+2500;this.hostileShot(e,1,0,205);}
+      if(e.boss)this.updateBoss(e,time,d);return true;});}
+  updateBoss(e:Enemy,time:number,d:number){
+    const ratio=e.hp/e.maxHp;const phase=ratio>.66?1:ratio>.33?2:3;
+    if(phase!==this.bossPhase){this.bossPhase=phase;this.announce(`${this.level.boss.toUpperCase()} • PHASE ${phase}`);this.cameras.main.flash(220,220,80,55);}
+    if(this.level.id===1){e.speed=phase===1?58:phase===2?82:105;if(d<430&&time>(e.nextShot??0)){e.nextShot=time+(phase===3?900:1350);this.hostileShot(e,phase===1?1:phase===2?3:5,.3,190+phase*20);}}
+    else if(this.level.id===2){if(time>(e.nextShot??0)){e.nextShot=time+(phase===3?850:1350);if(phase>1){const p=this.randomOpen();e.setPosition(p.x,p.y);this.floatText(e.x,e.y-45,'AMBUSH','#75d2df');}this.hostileShot(e,phase+1,.4,175+phase*25);}}
+    else if(this.level.id===3){if(time>(e.nextShot??0)){e.nextShot=time+(phase===3?700:1200);this.hostileShot(e,phase*2+1,.2,180+phase*20);if(phase===3&&this.enemies.countActive()<3)this.spawnEnemy(false,Phaser.Math.Between(0,7));}}
+    else if(d<420&&time>(e.nextShot??0)){e.nextShot=time+1600;this.hostileShot(e,3,.28,190);}
+  }
+  hostileShot(e:Enemy,count=3,spread=.28,speed=190){const angle=Phaser.Math.Angle.Between(e.x,e.y,this.player.x,this.player.y);for(let n=0;n<count;n++){const offset=(n-(count-1)/2)*spread;const orb=this.physics.add.image(e.x,e.y,'shot').setTint(0xef685f).setScale(.45).setDepth(4);this.physics.velocityFromRotation(angle+offset,speed,orb.body!.velocity);this.time.delayedCall(2400,()=>orb.active&&orb.destroy());this.physics.add.overlap(this.player,orb,()=>{orb.destroy();this.damage(12+this.level.id)});}}
+  updateMoxie(time:number){if(!this.moxieRescued){this.moxie.setVelocity(0);return;}if(this.moxieHp<=0){this.moxie.setAlpha(.25).setVelocity(0);return;}this.moxie.setAlpha(1);let target:Enemy|null=null,dist=260;this.enemies.children.each(o=>{const e=o as Enemy;const d=Phaser.Math.Distance.Between(this.moxie.x,this.moxie.y,e.x,e.y);if(d<dist){dist=d;target=e}return true;});if(target){this.physics.moveToObject(this.moxie,target,150);if(dist<58&&time>this.nextMoxieAttack){this.nextMoxieAttack=time+850;(target as Enemy).hp-=7+this.save.moxieBond*2;this.floatText((target as Enemy).x,(target as Enemy).y-30,'WOOF!',C.teal);if((target as Enemy).hp<=0)this.killEnemy(target as Enemy);}}else{const d=Phaser.Math.Distance.Between(this.moxie.x,this.moxie.y,this.player.x,this.player.y);if(d>95)this.physics.moveToObject(this.moxie,this.player,175);else this.moxie.setVelocity(0);}}
   attack(x:number,y:number){if(this.time.now<this.lastAttack+320)return;this.lastAttack=this.time.now;const a=Phaser.Math.Angle.Between(this.player.x,this.player.y,x,y);const s=this.shots.create(this.player.x,this.player.y,'shot') as Phaser.Physics.Arcade.Sprite;s.setScale(.35).setTint(this.hero.color).setDepth(6);this.physics.velocityFromRotation(a,430,s.body!.velocity);this.time.delayedCall(850,()=>s.destroy());}
+  inHazard(){return !!this.feature?.hazards.some(r=>Math.abs(this.player.x-r.x)<r.w/2&&Math.abs(this.player.y-r.y)<r.h/2);}
+  touchHazard(_h:Phaser.Physics.Arcade.Sprite){
+    if(this.level.id===2)return;
+    if(this.time.now<this.nextHazardDamage)return;this.nextHazardDamage=this.time.now+700;
+    this.damage(this.level.id===1?10:8);this.floatText(this.player.x,this.player.y-35,this.level.id===1?'SAW BLADE!':'PRESSURE PLATE!','#ff826d');
+    if(this.level.id===3&&!this.bossSpawned){this.enemies.children.each(o=>{const e=o as Enemy;if(Phaser.Math.Distance.Between(this.player.x,this.player.y,e.x,e.y)<130){e.hp-=12;if(e.hp<=0)this.killEnemy(e);}return true;});}
+  }
+  hitFeatureTarget(s:Phaser.Physics.Arcade.Sprite,t:FeatureTarget){
+    if(!t.active||t.getData('done')||this.level.id===3)return;s.destroy();t.hp--;
+    t.setTintFill(0xffffff);this.time.delayedCall(70,()=>t.active&&t.setTint(this.level.id===1?0xa9703c:0x55b4cf));
+    if(t.hp<=0)this.completeFeatureTarget(t);
+  }
+  touchFeatureTarget(t:FeatureTarget){if(this.level.id===3&&!t.getData('done'))this.completeFeatureTarget(t);}
+  completeFeatureTarget(t:FeatureTarget){
+    if(t.getData('done'))return;t.setData('done',true);this.featureProgress++;
+    this.children.each(o=>{if(o instanceof Phaser.GameObjects.Text&&o.getData('targetLabel')===t.index)o.destroy();});
+    const label=this.level.id===1?'LUMBER CLEARED':this.level.id===2?'PUMP ONLINE':'SAFETY SEAL COLLECTED';
+    this.floatText(t.x,t.y-20,`${label} ${this.featureProgress}/${this.feature!.objectiveCount}`,C.amber);t.destroy();
+    if(this.level.id===2){this.hp=Math.min(this.maxHp,this.hp+12);this.rangedBoost+=2;this.announce(`PUMP ONLINE • RANGED POWER +${this.rangedBoost}`);}
+    if(this.featureProgress===this.feature!.objectiveCount){this.announce(`${this.feature!.objectiveNoun} COMPLETE • BOSS ACCESS UNLOCKED`);this.ledgerSay(this.level.id===3?'THE LEDGER: All seals collected. Compliance remains emotionally unlikely.':'THE LEDGER: Objective complete. Management has authorized a larger problem.');}
+    this.maybeSpawnBoss();
+  }
+  rescueMoxie(){
+    if(this.moxieRescued)return;this.moxieRescued=true;this.moxie.clearTint().setAlpha(1);this.announce('MOXIE RESCUED • COMPANION COMMANDS ONLINE');this.ledgerSay('THE LEDGER: Inventory item Moxie has reclassified you as support staff.');this.maybeSpawnBoss();
+  }
+  useTerminal(){if(this.level.id!==3||this.terminalUsed)return;this.terminalUsed=true;this.hp=this.maxHp;this.moxieHp=60+this.save.moxieBond*8;this.stamina=100;this.terminals.children.each(o=>{(o as Phaser.Physics.Arcade.Sprite).setTint(0x52615e).setAlpha(.5);return true;});this.announce('REST TERMINAL USED • TEAM RESTORED');this.ledgerSay('THE LEDGER: Break approved. It has already been deducted from your future.');}
   mobileAttack(){let target:Enemy|null=null,dist=9999;this.enemies.children.each(o=>{const e=o as Enemy;const d=Phaser.Math.Distance.Between(this.player.x,this.player.y,e.x,e.y);if(d<dist){dist=d;target=e}return true;});if(target)this.attack((target as Enemy).x,(target as Enemy).y);}
-  hitEnemy(s:Phaser.Physics.Arcade.Sprite,e:Enemy){s.destroy();e.hp-=10+this.save.stats.might*.8;this.floatText(e.x,e.y-28,`-${Math.round(10+this.save.stats.might*.8)}`,'#f6d17c');e.setTintFill(0xffffff);this.time.delayedCall(70,()=>e.active&&e.clearTint());if(e.hp<=0)this.killEnemy(e);}
-  killEnemy(e:Enemy){const boss=!!e.boss;const p={x:e.x,y:e.y};e.destroy();this.kills++;this.save.xp+=boss?150:12+this.level.id;if(Math.random()<.36||boss)this.loot.create(p.x,p.y,'loot').setScale(boss?1:.65);if(this.kills%4===0&&!boss)this.ledgerSay('THE LEDGER: Four hostiles removed. Custodial deducted cleanup from your pay.');if(!this.bossSpawned&&this.kills>=this.required){this.bossSpawned=true;this.spawnEnemy(true);this.announce(`BOSS INBOUND: ${this.level.boss.toUpperCase()}`);this.ledgerSay(`THE LEDGER: ${this.level.boss} would like a brief word about your performance.`);}if(boss)this.finishLevel();this.rankUp();}
+  hitEnemy(s:Phaser.Physics.Arcade.Sprite,e:Enemy){s.destroy();const damage=10+this.save.stats.might*.8+this.rangedBoost;e.hp-=damage;this.floatText(e.x,e.y-28,`-${Math.round(damage)}`,'#f6d17c');e.setTintFill(0xffffff);this.time.delayedCall(70,()=>e.active&&e.clearTint());if(e.hp<=0)this.killEnemy(e);}
+  killEnemy(e:Enemy){const boss=!!e.boss;const p={x:e.x,y:e.y};e.destroy();if(!boss)this.kills++;this.save.xp+=boss?150:12+this.level.id;if(Math.random()<.36||boss)this.loot.create(p.x,p.y,'loot').setScale(boss?1:.65);if(this.kills%4===0&&!boss)this.ledgerSay('THE LEDGER: Four hostiles removed. Custodial deducted cleanup from your pay.');this.maybeSpawnBoss();if(boss)this.finishLevel();this.rankUp();}
+  maybeSpawnBoss(){if(this.bossSpawned||this.kills<this.required)return;const objectiveDone=!this.feature||this.featureProgress>=this.feature.objectiveCount;const rescueDone=this.level.id!==1||this.moxieRescued;if(!objectiveDone||!rescueDone){this.announce('AREA CLEAR • COMPLETE THE SECTOR OBJECTIVE');return;}this.bossSpawned=true;this.spawnEnemy(true);this.announce(`BOSS INBOUND: ${this.level.boss.toUpperCase()}`);this.ledgerSay(`THE LEDGER: ${this.level.boss} would like a brief word about your performance.`);}
   rankUp(){const needed=this.save.rank*100;if(this.save.xp>=needed){this.save.xp-=needed;this.save.rank++;this.save.statPoints++;this.maxHp+=6;this.hp=this.maxHp;this.announce(`RANK ${this.save.rank}! ATTRIBUTE POINT BANKED.`);}}
   contact(e:Enemy){if(!e.active||this.player.getData('hurt'))return;this.player.setData('hurt',true);this.damage((e.boss?18:7)+this.level.id*.8);const a=Phaser.Math.Angle.Between(e.x,e.y,this.player.x,this.player.y);this.player.setVelocity(Math.cos(a)*320,Math.sin(a)*320);this.time.delayedCall(650,()=>this.player.setData('hurt',false));}
   moxieContact(e:Enemy){if(!e.active||this.moxie.getData('hurt')||this.moxieHp<=0)return;this.moxie.setData('hurt',true);this.moxieHp-=e.boss?15:5;this.time.delayedCall(700,()=>this.moxie.setData('hurt',false));}
   damage(n:number){this.hp-=n;this.cameras.main.shake(100,.006);if(this.hp/this.maxHp<.28&&!this.lowHealthCommented){this.lowHealthCommented=true;this.ledgerSay('THE LEDGER: Health critical. Have you considered simply being harder to kill?');}if(this.hp<=0){if(!this.revived&&this.moxieHp>0){this.revived=true;this.hp=this.maxHp*.35;this.moxieHp=Math.max(1,this.moxieHp-20);this.announce('MOXIE REVIVED YOU. GOOD DOG. QUESTIONABLE BENEFITS PACKAGE.');this.ledgerSay('THE LEDGER: Your dog filed a complaint regarding team competency.');}else this.gameOver();}}
   dodge(){if(this.stamina<25)return;this.stamina-=25;const b=this.player.body!.velocity.clone();if(b.length()<10)b.set(1,0);b.normalize().scale(440);this.player.setVelocity(b.x,b.y);this.player.setData('hurt',true);if(Math.random()<.14)this.ledgerSay('THE LEDGER: A graceful dodge. Your paperwork remains stationary.');this.time.delayedCall(280,()=>this.player.setData('hurt',false));}
   skill(){if(this.time.now<this.lastSkill+5000)return;this.lastSkill=this.time.now;if(this.hero.id==='bud'){this.enemies.children.each(o=>{const e=o as Enemy;if(Phaser.Math.Distance.Between(this.player.x,this.player.y,e.x,e.y)<150){e.hp-=35;e.setVelocity((e.x-this.player.x)*4,(e.y-this.player.y)*4);if(e.hp<=0)this.killEnemy(e);}return true;});this.cameras.main.shake(180,.01);}else if(this.hero.id==='erin'){const p=this.input.activePointer;const a=Phaser.Math.Angle.Between(this.player.x,this.player.y,p.worldX,p.worldY);this.player.setPosition(this.player.x+Math.cos(a)*180,this.player.y+Math.sin(a)*180);this.enemies.children.each(o=>{(o as Enemy).setTint(0x7be0d4);return true;});this.time.delayedCall(1800,()=>this.enemies.children.each(o=>{(o as Enemy).clearTint();return true;}));}else{const x=this.player.x,y=this.player.y;const marker=this.add.circle(x,y,20,0xc58ed6,.6);this.tweens.add({targets:marker,scale:3,alpha:0,duration:1100,onComplete:()=>{this.enemies.children.each(o=>{const e=o as Enemy;if(Phaser.Math.Distance.Between(x,y,e.x,e.y)<150){e.hp-=42;if(e.hp<=0)this.killEnemy(e);}return true;});marker.destroy();this.cameras.main.shake(220,.012);}});}}
-  commandMoxie(){this.save.moxieBond=Math.min(10,this.save.moxieBond+.02);this.mobileAttack();this.announce('MOXIE: TARGET MARKED. TAIL STATUS: OPERATIONAL.');if(Math.random()<.3)this.ledgerSay('THE LEDGER: Moxie understood the assignment before you finished saying it.');}
+  commandMoxie(){if(!this.moxieRescued){this.announce('FIND MOXIE BEFORE ISSUING DOG ORDERS');return;}this.save.moxieBond=Math.min(10,this.save.moxieBond+.02);this.mobileAttack();this.announce('MOXIE: TARGET MARKED. TAIL STATUS: OPERATIONAL.');if(Math.random()<.3)this.ledgerSay('THE LEDGER: Moxie understood the assignment before you finished saying it.');}
   collect(l:Phaser.Physics.Arcade.Sprite){l.destroy();this.hp=Math.min(this.maxHp,this.hp+18);this.stamina=100;this.floatText(this.player.x,this.player.y-40,'SUPPLIES + HEALTH','#69d4a0');if(Math.random()<.35)this.ledgerSay('THE LEDGER: Loot acquired. Side effects include optimism and inventory management.');}
   finishLevel(){this.completed=true;this.player.setVelocity(0);this.save.achievements.push(`Cleared ${this.level.title}`);this.save.moxieBond=Math.min(10,this.save.moxieBond+.5);writeSave(this.save);this.time.delayedCall(600,()=>this.showRest());}
   showRest(){
@@ -301,7 +390,7 @@ class GameScene extends Phaser.Scene {
   announce(msg:string){this.status.setText(msg);this.time.delayedCall(2600,()=>this.status.setText(''));}
   ledgerSay(msg:string){if(!this.ledgerText?.active)return;this.tweens.killTweensOf([this.ledgerBox,this.ledgerText]);this.ledgerText.setText(msg).setAlpha(1);this.ledgerBox.setAlpha(1);this.time.delayedCall(4300,()=>{if(!this.ledgerText?.active)return;this.tweens.add({targets:[this.ledgerBox,this.ledgerText],alpha:0,duration:500});});}
   floatText(x:number,y:number,msg:string,color:string){const t=this.add.text(x,y,msg,{fontSize:'14px',fontStyle:'bold',color}).setOrigin(.5).setDepth(10);this.tweens.add({targets:t,y:y-35,alpha:0,duration:700,onComplete:()=>t.destroy()});}
-  drawHud(){this.stamina=Math.min(100,this.stamina+.12);this.hpBar.clear();this.hpBar.fillStyle(0x263334).fillRect(180,17,210,14);this.hpBar.fillStyle(0xc85249).fillRect(180,17,210*Math.max(0,this.hp/this.maxHp),14);this.hpBar.fillStyle(0x3e7973).fillRect(180,41,210*this.stamina/100,8);this.hpBar.fillStyle(0xe8e4d9).fillRect(180,57,210*Math.max(0,this.moxieHp/(60+this.save.moxieBond*8)),7);this.status.setText(this.status.text||`HOSTILES ${Math.max(0,this.required-this.kills)} • ${this.bossSpawned?'BOSS ACTIVE':'BOSS LOCKED'}`);this.mini.clear();this.mini.fillStyle(0x071112,.8).fillRect(W-172,8,160,66);this.mini.lineStyle(1,0x8da09a).strokeRect(W-172,8,160,66);this.mini.fillStyle(0x64716e,.72);this.wallRects.forEach(r=>this.mini.fillRect(W-172+(r.x-r.w/2)/1800*160,8+(r.y-r.h/2)/1100*66,Math.max(1,r.w/1800*160),Math.max(1,r.h/1100*66)));this.mini.fillStyle(0x67b4ad).fillCircle(W-172+this.player.x/1800*160,8+this.player.y/1100*66,3);this.mini.fillStyle(0xe8e4d9).fillCircle(W-172+this.moxie.x/1800*160,8+this.moxie.y/1100*66,2);this.mini.fillStyle(0xd15c4f);this.enemies.children.each(o=>{const e=o as Enemy;this.mini.fillCircle(W-172+e.x/1800*160,8+e.y/1100*66,e.boss?3:1);return true;});}
+  drawHud(){this.stamina=Math.min(100,this.stamina+.12);this.hpBar.clear();this.hpBar.fillStyle(0x263334).fillRect(180,17,210,14);this.hpBar.fillStyle(0xc85249).fillRect(180,17,210*Math.max(0,this.hp/this.maxHp),14);this.hpBar.fillStyle(0x3e7973).fillRect(180,41,210*this.stamina/100,8);this.hpBar.fillStyle(0xe8e4d9).fillRect(180,57,210*Math.max(0,this.moxieHp/(60+this.save.moxieBond*8)),7);let boss:Enemy|undefined;this.enemies.children.each(o=>{const e=o as Enemy;if(e.boss)boss=e;return true;});if(boss){this.hpBar.fillStyle(0x2b1c1d).fillRect(790,52,255,10);this.hpBar.fillStyle(0xd15c4f).fillRect(790,52,255*Math.max(0,boss.hp/boss.maxHp),10);}const featureStatus=this.feature?`${this.feature.objectiveNoun} ${this.featureProgress}/${this.feature.objectiveCount}${this.level.id===1?` • MOXIE ${this.moxieRescued?'SAFE':'MISSING'}`:''}`:'';this.status.setText(this.status.text||`${featureStatus}${featureStatus?'\n':''}HOSTILES ${Math.max(0,this.required-this.kills)} • ${this.bossSpawned?`BOSS PHASE ${this.bossPhase}`:'BOSS LOCKED'}`);this.mini.clear();this.mini.fillStyle(0x071112,.8).fillRect(W-172,8,160,66);this.mini.lineStyle(1,0x8da09a).strokeRect(W-172,8,160,66);this.mini.fillStyle(0x64716e,.72);this.wallRects.forEach(r=>this.mini.fillRect(W-172+(r.x-r.w/2)/1800*160,8+(r.y-r.h/2)/1100*66,Math.max(1,r.w/1800*160),Math.max(1,r.h/1100*66)));this.mini.fillStyle(0x67b4ad).fillCircle(W-172+this.player.x/1800*160,8+this.player.y/1100*66,3);this.mini.fillStyle(0xe8e4d9).fillCircle(W-172+this.moxie.x/1800*160,8+this.moxie.y/1100*66,2);this.mini.fillStyle(0xd15c4f);this.enemies.children.each(o=>{const e=o as Enemy;this.mini.fillCircle(W-172+e.x/1800*160,8+e.y/1100*66,e.boss?3:1);return true;});}
 }
 
 new Phaser.Game({type:Phaser.AUTO,parent:'game',width:W,height:H,backgroundColor:'#081011',pixelArt:false,physics:{default:'arcade',arcade:{debug:false}},scale:{mode:Phaser.Scale.FIT,autoCenter:Phaser.Scale.CENTER_BOTH},scene:[BootScene,TitleScene,GuideScene,SelectScene,StoryScene,GameScene]});

@@ -6,7 +6,7 @@ Repository: [https://github.com/mguhlin/dungeonrun](https://github.com/mguhlin/d
 
 ## Current Status
 
-Dungeon Run is a deployed, playable browser-game foundation with a complete twenty-level campaign outline and a functional real-time combat loop. Levels share the same core procedural gameplay system while their stories, environments, objectives, creature names, mechanics, colors, and bosses are defined separately in campaign data.
+Dungeon Run is a deployed, playable browser-game foundation with a complete twenty-level campaign outline and a functional real-time combat loop. Levels 1–3 now form the first authored gameplay batch, while Levels 4–20 continue to use the shared procedural campaign system.
 
 The current release is best described as a polished systems prototype and campaign framework. It proves the main loop, establishes the visual identity, and supports expansion without requiring a rewrite of the underlying game.
 
@@ -40,6 +40,15 @@ The current release is best described as a polished systems prototype and campai
 - Wall-aware minimap with player, Moxie, enemy, and boss markers
 - Rest areas, bathrooms, environmental signs, checkpoint saves, and sarcastic commentary
 
+### Levels 1–3 authored gameplay
+
+- Three distinct handcrafted layouts with fixed starts, encounters, routes, hazards, and objective locations
+- **The Fallen Mill:** breakable lumber, moving conveyor lanes, saw-blade hazards, a Moxie rescue gate, two enemy archetypes, and a three-phase Splinter Foreman
+- **Culvert Country:** water slowdown zones, three destructible pump controls, ranged-power pump rewards, ranged Pipe Eels, and a teleporting three-phase Drainback ambush
+- **The Safety Department:** collectible safety seals, pressure plates that can hurt nearby enemies, ranged Compliance Drones, a one-use rest terminal, and a three-phase Inspector Nine fight with reinforcements
+- Objective and Moxie status in the HUD, boss phase announcements, and a visible boss health bar
+- Data tests for authored-plan completeness, world bounds, objective counts, and distinct geometry
+
 ### Art and presentation
 
 - Original graphic-novel title artwork
@@ -63,7 +72,7 @@ The current release is best described as a polished systems prototype and campai
 - Common enemies currently share one creature medallion, and bosses share one boss medallion
 - Hero gameplay pieces use portrait icons rather than animated top-down sprites
 - Moxie uses a painted portrait icon rather than an animated top-down poodle sprite
-- Level-specific mechanics are described in the campaign data but many still use the shared combat implementation
+- Levels 4–20 still use the shared procedural combat implementation
 - Dungeon layouts are denser and connected, but they are generated from one common structural pattern
 - Enemy behavior is primarily chase-and-contact combat; boss behavior adds a ranged spread but is not yet unique per boss
 - Inventory, equipment, crafting, attribute spending, factions, and branching consequences are represented lightly or reserved for expansion
@@ -90,13 +99,13 @@ The current release is best described as a polished systems prototype and campai
 4. Add health bars and readable attack telegraphs above enemies and bosses
 5. Update the title artwork or add a new panel that reflects the canonical white Moxie
 
-### Priority Three: Vertical-slice depth for Levels 1–3
+### Priority Three: Continue polishing Levels 1–3
 
-1. **The Fallen Mill:** Add saw blades, conveyors, breakable lumber, a Moxie-rescue objective, and a multi-phase Splinter Foreman fight
-2. **Culvert Country:** Add water slowdown, pump controls, ranged pickups, submerged routes, and Drainback ambush behavior
-3. **The Safety Department:** Add pressure plates, compliance drones, collectible safety seals, a usable rest terminal, and Inspector Nine inspection phases
-4. Give each level a unique handcrafted or seeded layout rather than only changing colors and labels
-5. Add optional rooms, lore discoveries, challenge rooms, and level-specific achievements
+1. Replace the current geometric hazard and objective markers with finished environment art and animation
+2. Add optional rooms, lore discoveries, challenge rooms, and level-specific achievements
+3. Add richer telegraphs and animation for every boss phase
+4. Playtest route readability, encounter pacing, difficulty, and mobile performance
+5. Add browser-driven tests for each objective gate and boss transition
 
 ### Priority Four: Progression systems
 
