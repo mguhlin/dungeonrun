@@ -1,0 +1,24 @@
+Security maintenance — 2026-10-27
+
+Scope: known npm advisories in tracked lockfiles, GitHub Actions references and
+permissions, dependency maintenance controls, and the checks listed below.
+This is a scoped maintenance review, not a full penetration test or assurance
+against unknown vulnerabilities. Historical release archives, external CDNs,
+cloud/account configuration, and separately installed self-hosted instances are
+not covered by a zero-advisory lockfile result. A package advisory count can
+include development-only dependencies and repeat across projects.
+
+The tracked npm dependency tree reports zero known vulnerabilities after
+updates. Vite uses a patched release; affected transitive packages were updated
+within compatible ranges. Dungeon Run additionally moves its test runner to
+Vitest 4.1.12 to remove affected mocker/tinypool dependencies. Floating latest
+manifest entries, where present, were replaced by explicit installed versions.
+
+Added weekly Dependabot coverage and a weekly dependency audit that does not
+install dependencies. Workflows use immutable action hashes, read-only source
+permissions, and no persisted checkout credentials. Node-based build workflows
+use Node 22 and skip dependency install lifecycle scripts.
+
+Checks: clean dependency installation with scripts disabled; all available unit
+tests and production build passed. GridSplat lint also passed. Workflow YAML
+parsed and action pins verified.
