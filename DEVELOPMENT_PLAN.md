@@ -1,7 +1,7 @@
 # Dungeon Run Development Plan
 
-Last updated: August 4, 2026  
-Production: [https://mguhlin.github.io/dungeonrun/](https://mguhlin.github.io/dungeonrun/)  
+
+Production: [https://mguhlin.github.io/dungeonrun/](https://mguhlin.github.io/dungeonrun/)
 Repository: [https://github.com/mguhlin/dungeonrun](https://github.com/mguhlin/dungeonrun)
 
 ## Current Status
